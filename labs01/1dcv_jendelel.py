@@ -80,16 +80,6 @@ def get_accuracy(summaryString):
     summary.ParseFromString(summaryString)
     return summary.value[0].simple_value
 
-
-def my_argmax(arr):
-    index = 0;
-    max_index = -1;
-    for (_, dacc, _) in arr:
-        if max_index == -1 or arr[max_index][1] < dacc:
-            max_index = index
-        index += 1
-    return max_index
-
 if __name__ == '__main__':
     # Fix random seed
     np.random.seed(42)
@@ -132,5 +122,5 @@ if __name__ == '__main__':
             print("{} - dev acc: {}, test_acc: {}".format(exp_name, dev_accuracy, test_accuracy))
             results.append((exp_name, dev_accuracy, test_accuracy))
 
-    best = results[my_argmax(results)]
+    best = max(results, key= lambda x: x[1])
     print("Best hyperparams:\n{} - dev acc: {}, test_acc: {}".format(best[0], best[1], best[2]))
