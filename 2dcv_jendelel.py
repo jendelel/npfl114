@@ -120,29 +120,28 @@ if __name__ == "__main__":
 
 
     results = []
-#    for (optimizer,nameOpt) in allOptimizers:
-#        for batchsize in [50,10,1]:
-#             # Load the data
-#             from tensorflow.examples.tutorials.mnist import input_data
-#             mnist = input_data.read_data_sets("mnist_data/", reshape=False)
-#
-#            exp_name = "{}-{}".format(batchsize, nameOpt)
-#            network = Network(threads=args.threads, logdir=args.logdir, expname=exp_name)
-#            with network.session.graph.as_default():
-#                network.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
-#            network.construct(100,optimizer)
-#            # Train
-#            dev_acc = 0;
-#            test_acc = 0;
-#            for i in range(args.epochs):
-#                while mnist.train.epochs_completed == i:
-#                    images, labels = mnist.train.next_batch(batchsize)
-#                    network.train(images, labels, network.training_step % 100 == 0, network.training_step == 0)
-#
-#                dev_acc = network.evaluate("dev", mnist.validation.images, mnist.validation.labels, True)
-#                test_acc = network.evaluate("test", mnist.test.images, mnist.test.labels, True)
-#            results.append((exp_name, dev_acc, test_acc))
-#            print(results[-1])
+    for (optimizer,nameOpt) in allOptimizers:
+        for batchsize in [50,10,1]:
+            # Load the data
+            from tensorflow.examples.tutorials.mnist import input_data
+            mnist = input_data.read_data_sets("mnist_data/", reshape=False)
+            exp_name = "{}-{}".format(batchsize, nameOpt)
+            network = Network(threads=args.threads, logdir=args.logdir, expname=exp_name)
+            with network.session.graph.as_default():
+                network.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
+            network.construct(100,optimizer)
+            # Train
+            dev_acc = 0;
+            test_acc = 0;
+            for i in range(args.epochs):
+                while mnist.train.epochs_completed == i:
+                    images, labels = mnist.train.next_batch(batchsize)
+                    network.train(images, labels, network.training_step % 100 == 0, network.training_step == 0)
+
+                dev_acc = network.evaluate("dev", mnist.validation.images, mnist.validation.labels, True)
+                test_acc = network.evaluate("test", mnist.test.images, mnist.test.labels, True)
+            results.append((exp_name, dev_acc, test_acc))
+            print(results[-1])
 
 
     for (startRate,endRate) in [(0.01,0.001), (0.01,0.0001), (0.001, 0.0001)]:
