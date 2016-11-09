@@ -31,26 +31,25 @@ class Network:
             with tf.name_scope("inputs"):
                 self.images = tf.placeholder(tf.float32, [None, self.WIDTH, self.HEIGHT, 1], name="images")
                 self.labels = tf.placeholder(tf.int64, [None], name="labels")
+                self.keep_prob = tf.placeholder_with_default(1.0, [], name="keep_prob")
 
             # 28x28x1
-            conv_1 = tf_layers.convolution2d(inputs=self.images, num_outputs=5, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=5, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_1 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=3, stride=2)
+            conv_1 = tf_layers.convolution2d(inputs=self.images, num_outputs=32, kernel_size=5, stride=1, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_1 = tf_layers.max_pool2d(inputs=conv_1, kernel_size=2, stride=2)
+            conv_2 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=5, stride=1, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_2 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=2, stride=2)
+            flatten  = tf_layers.flatten(mp_2)
+            fc = tf_layers.fully_connected(inputs=flatten, num_outputs=1024)
+            fc_drop = tf.nn.dropout(fc, self.keep_prob)
 
-            # 13x13x5
-            conv_4 = tf_layers.convolution2d(inputs=mp_1, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_5 = tf_layers.convolution2d(inputs=conv_4, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_6 = tf_layers.convolution2d(inputs=conv_5, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_2 = tf_layers.max_pool2d(inputs=conv_6, kernel_size=3, stride=2)
-
-            # 6x6x10 
-            flatten_m1  = tf_layers.flatten(mp_2)
-            output_layer = tf_layers.fully_connected(flatten_m1, num_outputs=self.LABELS, activation_fn=None, scope="output_layer")
+            output_layer = tf_layers.fully_connected(fc_drop, num_outputs=self.LABELS, activation_fn=None, scope="output_layer")
             self.predictions = tf.argmax(output_layer, 1)
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.labels, scope="loss")
             self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
-            self.training = tf.train.AdamOptimizer().minimize(loss, global_step=self.global_step)
+
+            self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, global_step=self.global_step)
+
             self.accuracy = tf_metrics.accuracy(self.predictions, self.labels)
 
             # Summaries
@@ -71,11 +70,11 @@ class Network:
     def training_step(self):
         return self.session.run(self.global_step)
 
-    def train(self, images, labels, summaries=False, run_metadata=False):
+    def train(self, images, labels, summaries=False, run_metadata=False, keep_prob=1):
         if (summaries or run_metadata) and not self.summary_writer:
             raise ValueError("Logdir is required for summaries or run_metadata.")
 
-        args = {"feed_dict": {self.images: images, self.labels: labels}}
+        args = {"feed_dict": {self.images: images, self.labels: labels, self.keep_prob: keep_prob}}
         targets = [self.training]
         if summaries:
             targets.append(self.summaries["training"])
@@ -129,7 +128,7 @@ if __name__ == "__main__":
     for i in range(args.epochs):
         while mnist.train.epochs_completed == i:
             images, labels = mnist.train.next_batch(args.batch_size)
-            network.train(images, labels, network.training_step % 100 == 0, network.training_step == 0)
+            network.train(images, labels, network.training_step % 100 == 0, network.training_step == 0, keep_prob=0.5)
 
         dev_acc = network.evaluate("dev", mnist.validation.images, mnist.validation.labels, True)
         test_acc = network.evaluate("test", mnist.test.images, mnist.test.labels, True)
