@@ -35,16 +35,17 @@ class Network:
             # 28x28x1
             conv_1 = tf_layers.convolution2d(inputs=self.images, num_outputs=5, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
             conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=5, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_3 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=3, stride=2)
+            mp_1 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=3, stride=2)
 
             # 13x13x5
-            conv_4 = tf_layers.convolution2d(inputs=mp_3, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            conv_4 = tf_layers.convolution2d(inputs=mp_1, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
             conv_5 = tf_layers.convolution2d(inputs=conv_4, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_6 = tf_layers.max_pool2d(inputs=conv_5, kernel_size=3, stride=2)
+            conv_6 = tf_layers.convolution2d(inputs=conv_5, num_outputs=10, kernel_size=3, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_2 = tf_layers.max_pool2d(inputs=conv_6, kernel_size=3, stride=2)
 
             # 6x6x10 
-            flatten_m7  = tf_layers.flatten(mp_6)
-            output_layer = tf_layers.fully_connected(flatten_m7, num_outputs=self.LABELS, activation_fn=None, scope="output_layer")
+            flatten_m1  = tf_layers.flatten(mp_2)
+            output_layer = tf_layers.fully_connected(flatten_m1, num_outputs=self.LABELS, activation_fn=None, scope="output_layer")
             self.predictions = tf.argmax(output_layer, 1)
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.labels, scope="loss")
