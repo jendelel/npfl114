@@ -111,19 +111,19 @@ if __name__ == "__main__":
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--exp", default="1-gym-save", type=str, help="Experiment name.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-    parser.add_argument("--epochs", default=250, type=int, help="Epoch number.")
+    parser.add_argument("--epochs", default=300, type=int, help="Epoch number.")
     args = parser.parse_args()
-
-    # Construct the network
-    network = Network(threads=args.threads, logdir=args.logdir, expname=args.exp)
-    network.construct()
 
     # Get the data
     observations, labels = load_cartpole_data(filename="labs04/gym-cartpole-data.txt")
 
+    # Construct the network
+    network = Network(threads=args.threads, logdir=args.logdir, expname=args.exp)
+    network.construct(hidden_layer_size=200)
+
     # Train
     for _ in range(args.epochs):
         network.train(observations, labels, keep_prob=0.5)
-
     # Save the network
-    network.save("1-gym-model")
+    network.save(args.exp)
+
