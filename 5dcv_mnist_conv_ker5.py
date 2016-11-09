@@ -38,7 +38,7 @@ class Network:
             mp_1 = tf_layers.max_pool2d(inputs=conv_1, kernel_size=2, stride=2)
             conv_2 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=5, stride=1, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
             mp_2 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=2, stride=2)
-            flatten  = tf_layers.flatten(mp_2)
+            flatten = tf_layers.flatten(mp_2)
             fc = tf_layers.fully_connected(inputs=flatten, num_outputs=1024)
             fc_drop = tf.nn.dropout(fc, self.keep_prob)
 
