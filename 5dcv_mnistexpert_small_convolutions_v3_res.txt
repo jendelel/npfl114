@@ -1,0 +1,24 @@
+Extracting mnist_data/train-images-idx3-ubyte.gz
+Extracting mnist_data/train-labels-idx1-ubyte.gz
+Extracting mnist_data/t10k-images-idx3-ubyte.gz
+Extracting mnist_data/t10k-labels-idx1-ubyte.gz
+Epoch: 0, dev_acc: 0.978600025177, test_acc: 0.97729998827
+Epoch: 1, dev_acc: 0.988200008869, test_acc: 0.986100018024
+Epoch: 2, dev_acc: 0.990400016308, test_acc: 0.991299986839
+Epoch: 3, dev_acc: 0.991199970245, test_acc: 0.990800023079
+Epoch: 4, dev_acc: 0.989400029182, test_acc: 0.990299999714
+Epoch: 5, dev_acc: 0.993399977684, test_acc: 0.991500020027
+Epoch: 6, dev_acc: 0.993399977684, test_acc: 0.993799984455
+Epoch: 7, dev_acc: 0.992399990559, test_acc: 0.993099987507
+Epoch: 8, dev_acc: 0.993600010872, test_acc: 0.994599997997
+Epoch: 9, dev_acc: 0.992600023746, test_acc: 0.99430000782
+Epoch: 10, dev_acc: 0.994000017643, test_acc: 0.99430000782
+Epoch: 11, dev_acc: 0.99279999733, test_acc: 0.993600010872
+Epoch: 12, dev_acc: 0.991800010204, test_acc: 0.993099987507
+Epoch: 13, dev_acc: 0.994000017643, test_acc: 0.995000004768
+Epoch: 14, dev_acc: 0.994199991226, test_acc: 0.994799971581
+Epoch: 15, dev_acc: 0.995199978352, test_acc: 0.994000017643
+Epoch: 16, dev_acc: 0.995000004768, test_acc: 0.995100021362
+Epoch: 17, dev_acc: 0.995400011539, test_acc: 0.995299994946
+Epoch: 18, dev_acc: 0.995000004768, test_acc: 0.995400011539
+Epoch: 19, dev_acc: 0.993799984455, test_acc: 0.995199978352
