@@ -1,9 +1,9 @@
 #!/bin/bash
 #PBS -N mnist_conv_metacentrum
-#PBS -l nodes=1:ppn=4:debian8
-#PBS -l mem=2048mb
+#PBS -l nodes=1:ppn=8:debian8
+#PBS -l mem=10gb
 #PBS -l walltime=1d
-#PBS -l scratch=1gb
+#PBS -l scratch=5gb
 #PBS -j oe
 #PBS -m e
 # chybovy vystup pripoji ke standarnimu vystupu a posle mail pri skonceni ulohy
@@ -21,7 +21,7 @@ DATADIR="$PBS_O_WORKDIR"
 # Get input data
 cd $DATADIR
 file="script.py"
-args="--threads 4"
+args="--threads 8"
 wget "http://www.ms.mff.cuni.cz/~skopeko/files/dl/mnist_conv.py" -O "$file"
 cp $DATADIR/"$file" $SCRATCHDIR
 
@@ -61,10 +61,11 @@ fi
 output="out.log"
 logdir="logs"
 echo "Running python script..."
-python "$file" "$args" > "$output" 2>&1
+eval python "$file" "$args" > "$output" 2>&1
 echo "Python script finished."
 cat "$output"
 
 # vykopírování výsledků ze scratche (pokud selže, nechá data ve SCRATCHDIR a informuje uživatele)
 cp $SCRATCHDIR/$output $DATADIR || export CLEAN_SCRATCH=false
 cp -r $SCRATCHDIR/$logdir $DATADIR || export CLEAN_SCRATCH=false
+
