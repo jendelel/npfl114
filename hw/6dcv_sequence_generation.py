@@ -14,10 +14,9 @@ class Network:
     TRAIN = DATA - TEST
 
     def combine(self, output_tensor):
-        # TODO: Try first element
-        # tensor = tf_layers.fully_connected(output_tensor, 1, activation_fn=None)
-        tensor = tf_layers.linear(output_tensor, 1)
-        return tensor[0, 0]
+        with self.session.graph.as_default():
+            tensor = tf_layers.linear(output_tensor, 1)
+            return tensor[0, 0]
 
     def __init__(self, rnn_cell, rnn_cell_dim, logdir, expname, threads=1, seed=42):
         # Create an empty graph and a session
@@ -41,25 +40,29 @@ class Network:
 
             self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
 
-
             # zero_state(batch size, dtype)
-            state = rnn_cell.zero_state(1, tf.int64)
+            state = rnn_cell.zero_state(1, tf.float32)
             output = None
             output_list = []
             with tf.variable_scope("rnn", reuse=False):
-                (output, state) = rnn_cell(0.0, state)
-                output_list.append(output)
+                (output, state) = rnn_cell(tf.reshape(tf.cast(0.0, tf.float32), [1, 1]), state)
+                output_list.append(self.combine(output))
             for i in range(self.TRAIN - 1):
                 with tf.variable_scope("rnn", reuse=True):
-                    (output, state) = rnn_cell(tf.reshape(self.data[i], [1,1]), state)
+                    (output, state) = rnn_cell(tf.reshape(self.data[i], [1, 1]), state)
                     output_list.append(self.combine(output))
 
             # Potreba pridat tf.pack na output_list a zavolat spravnou loss function s MSE
-            predictions = tf.pack(output_list) # "concat python list of tensors to a single tensor with one dimension extra"
+            predictions_list = list(output_list)
+            predictions = tf.pack(predictions_list) # "concat python list of tensors to a single tensor with one dimension extra"
             loss = tf.reduce_mean(predictions-self.data)**2
             self.training = tf.train.AdamOptimizer().minimize(loss, global_step=self.global_step)
 
-            # TODO: Nutno pridat prediction part of the network
+            for i in range(self.TRAIN, self.TEST+self.TRAIN):
+                with tf.variable_scope("rnn", reuse=True):
+                    (output, state) = rnn_cell(tf.reshape(output_list[i-1], [1, 1]), state)
+                    output_list.append(self.combine(output))
+            self.generated_list = tf.pack(output_list)
 
             # Image summaries
             self.image_tag = tf.placeholder(tf.string, [])
@@ -76,11 +79,13 @@ class Network:
     def train(self, train_sequence):
         args = {"feed_dict": {self.data: train_sequence}}
         targets = [self.training]
-        targets.append(self.summarize_image)
-        results = self.session.run(targets, **args)
+        self.session.run(targets, **args)
 
     def predict(self, train_sequence):
-        # TODO
+        args = {"feed_dict": {self.data: train_sequence}}
+        targets = [self.generated_list]
+        results = self.session.run(targets, **args)
+        return results[0]
 
     def image_summary(self, gold, predictions, epoch):
         min_value = min(np.min(gold), np.min(predictions))
@@ -108,7 +113,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
-    parser.add_argument("--numcells", default=10, type=int, help="Number of rnn cells.")
     parser.add_argument("--rnn_cell_dim", default=10, type=int, help="RNN cell dimension.")
     parser.add_argument("--steps_per_epoch", default=500, type=int, help="Training steps per epoch.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
@@ -127,7 +131,7 @@ if __name__ == "__main__":
 
     # Construct the network
     expname = "sequence-generation-{}{}-epochs{}-per_epoch{}".format(args.rnn_cell, args.rnn_cell_dim, args.epochs, args.steps_per_epoch)
-    network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, num_of_cells=args.numcells,  logdir=args.logdir, expname=expname, threads=args.threads)
+    network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,  logdir=args.logdir, expname=expname, threads=args.threads)
 
     # Train
     for epoch in range(args.epochs):
