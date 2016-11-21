@@ -2,3 +2,4 @@ mnist_data/
 logs/
 .idea/
 *.iml
+*.zip
