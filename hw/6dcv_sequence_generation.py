@@ -12,6 +12,13 @@ class Network:
     DATA = 144
     TEST = 40
     TRAIN = DATA - TEST
+
+    def combine(self, output_tensor):
+        # TODO: Try first element
+        # tensor = tf_layers.fully_connected(output_tensor, 1, activation_fn=None)
+        tensor = tf_layers.linear(output_tensor, 1)
+        return tensor[0, 0]
+
     def __init__(self, rnn_cell, rnn_cell_dim, logdir, expname, threads=1, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
@@ -24,7 +31,7 @@ class Network:
 
         # Construct the graph
         with self.session.graph.as_default():
-            self.data = tf.placeholder(tf.float32, [1,self.TRAIN])
+            self.data = tf.placeholder(tf.float32, [self.TRAIN])
             if rnn_cell == "LSTM":
                 rnn_cell = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
             elif rnn_cell == "GRU":
@@ -34,27 +41,25 @@ class Network:
 
             self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
 
+
+            # zero_state(batch size, dtype)
             state = rnn_cell.zero_state(1, tf.int64)
             output = None
             output_list = []
             with tf.variable_scope("rnn", reuse=False):
                 (output, state) = rnn_cell(0.0, state)
                 output_list.append(output)
-            for (i in range(self.TRAIN - 1)):
+            for i in range(self.TRAIN - 1):
                 with tf.variable_scope("rnn", reuse=True):
-                    (output, state) = rnn_cell(self.data[0,i], state)
-                    output_list.append(output)
-            
+                    (output, state) = rnn_cell(tf.reshape(self.data[i], [1,1]), state)
+                    output_list.append(self.combine(output))
 
-       
-
-            # Pottreba pridat tf.pack na output_list a zavolat spravnou loss function s MSE
-            loss = tf.contrib.loss(output_list, self.data, scope="loss")
+            # Potreba pridat tf.pack na output_list a zavolat spravnou loss function s MSE
+            predictions = tf.pack(output_list) # "concat python list of tensors to a single tensor with one dimension extra"
+            loss = tf.reduce_mean(predictions-self.data)**2
             self.training = tf.train.AdamOptimizer().minimize(loss, global_step=self.global_step)
 
-
-            # Nutno pridat prediction part of the network
-
+            # TODO: Nutno pridat prediction part of the network
 
             # Image summaries
             self.image_tag = tf.placeholder(tf.string, [])

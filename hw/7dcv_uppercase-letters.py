@@ -104,6 +104,20 @@ class Network:
             self.sentence_lens = tf.placeholder(tf.int32, [None])
             self.labels = tf.placeholder(tf.int64, [None, None])
 
+            # rnn bunka implementovana dynamicky
+            # while bunka v TF (iba s jednym TF node pre RNN) ... cele v
+            # (outputs, state) tf.nn.dynamic_rnn (cell, inputs, seq_lens=None,
+            # init_state=None .. default zero_state z ^^cell, time_major=False)
+            # inputs: tensor[batch, sequence, input_size # one-hot vector, input representation #]
+            #
+            # ((outputs_fw, outputs_bw), (states_fw, states_bw))tf.bidirectional_dynamic_rnn(cell_fw, cell_bw, ...)
+
+            # Embeddings pro pismenka taky...
+            # tf.nn.embedding_lookup(weights (embeddings)...(tf.get_variable("alpha_emb", shape=[alphabet_size, dim_of_embedding])), indices (?dimenze?))
+            #
+            # Orezani outputs
+            # tf.sequence_mask(sequence_lengths, max_seq_length) to float (tf.cast) and multiply!
+
             # TODO
             # accuracy = ...
             # self.training = ...
