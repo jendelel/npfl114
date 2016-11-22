@@ -7,6 +7,8 @@ import datetime
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as tf_layers
+import tensorflow.contrib.losses as tf_losses
+import tensorflow.contrib.metrics as tf_metrics
 
 class Dataset:
     def __init__(self, filename, alphabet = None):
@@ -104,6 +106,21 @@ class Network:
             self.sentence_lens = tf.placeholder(tf.int32, [None])
             self.labels = tf.placeholder(tf.int64, [None, None])
 
+            input_words = tf.one_hot(self.sentences, alphabet_size) 
+            (ouputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words, self.sentence_lens)
+           
+            mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
+            masked_fw = tf.mul(mask, outputs_fw)
+            masked_bw = tf.mul(mask, outputs_bw)
+
+            outputs_fw = tf.reduce_sum(masked_fw, 2)
+            outputs_bw = tf.reduce_sum(masked_bw, 2)
+            outputs = tf.sum(outputs_bw, outputs_fw)
+
+            self.predictions = tf.round(tf.sigmoid(outputs))
+            loss = tf_losses.sparse_softmax_cross_entropy(outputs, self.labels)
+            self.training = tf.train.AdamOptimizer().minimize(loss)
+            accuracy = tf.contrib.metrics.accuracy(self.predictions, self.labels)
             # rnn bunka implementovana dynamicky
             # while bunka v TF (iba s jednym TF node pre RNN) ... cele v
             # (outputs, state) tf.nn.dynamic_rnn (cell, inputs, seq_lens=None,
