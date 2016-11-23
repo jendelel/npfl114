@@ -82,7 +82,7 @@ class Dataset:
 
 
 class Network:
-    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, logdir, expname, threads=1, seed=42):
+    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, embedding_dim, logdir, expname, threads=1, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -105,8 +105,13 @@ class Network:
             self.sentences = tf.placeholder(tf.int32, [None, None])
             self.sentence_lens = tf.placeholder(tf.int32, [None])
             self.labels = tf.placeholder(tf.int64, [None, None])
-
-            input_words = tf.one_hot(self.sentences, alphabet_size) 
+            
+            input_words=None
+            if embedding_dim == -1:
+                input_words = tf.one_hot(self.sentences, alphabet_size)
+            else:
+                input_words = tf.nn.embedding_lookup(tf.get_variable("alpha_emb", shape=[alphabet_size, embedding_dim]), self.sentences)
+            print("input words", input_words.get_shape())
             (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words, self.sentence_lens, dtype=tf.float32)
            
             print("outputs_bw", outputs_bw.get_shape())
@@ -192,6 +197,7 @@ if __name__ == "__main__":
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
     parser.add_argument("--rnn_cell_dim", default=10, type=int, help="RNN cell dimension.")
+    parser.add_argument("--embedding", default=150, type=int, help="Embedding dimension. If -1, one_hot is used.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
@@ -202,7 +208,7 @@ if __name__ == "__main__":
 
     # Construct the network
     expname = "uppercase-letters-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
-    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, logdir=args.logdir, expname=expname, threads=args.threads)
+    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads)
 
     # Train
     for epoch in range(args.epochs):
