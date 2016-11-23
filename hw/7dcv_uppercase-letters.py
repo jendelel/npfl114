@@ -107,20 +107,35 @@ class Network:
             self.labels = tf.placeholder(tf.int64, [None, None])
 
             input_words = tf.one_hot(self.sentences, alphabet_size) 
-            (ouputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words, self.sentence_lens)
+            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words, self.sentence_lens, dtype=tf.float32)
            
+            print("outputs_bw", outputs_bw.get_shape())
+            print("outputs_fw", outputs_fw.get_shape())
+            outputs_fw = tf.reduce_sum(outputs_fw, 2)
+            outputs_bw = tf.reduce_sum(outputs_bw, 2)
+            print("outputs_bw", outputs_bw.get_shape())
+            print("outputs_fw", outputs_fw.get_shape())
+
+            print("input_words", input_words.get_shape())
             mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
-            masked_fw = tf.mul(mask, outputs_fw)
-            masked_bw = tf.mul(mask, outputs_bw)
+            masked_fw = mask*outputs_fw
+            masked_bw = mask*outputs_bw
 
-            outputs_fw = tf.reduce_sum(masked_fw, 2)
-            outputs_bw = tf.reduce_sum(masked_bw, 2)
-            outputs = tf.sum(outputs_bw, outputs_fw)
+            outputs = masked_bw+masked_fw
+            print("outputs", outputs.get_shape())
 
-            self.predictions = tf.round(tf.sigmoid(outputs))
-            loss = tf_losses.sparse_softmax_cross_entropy(outputs, self.labels)
-            self.training = tf.train.AdamOptimizer().minimize(loss)
-            accuracy = tf.contrib.metrics.accuracy(self.predictions, self.labels)
+            self.predictions = tf.cast(tf.round(tf.sigmoid(outputs)), tf.int64)
+            print("predictions", self.predictions.get_shape())
+            print("labels", self.labels.get_shape())
+            labels_vec = tf.reshape(self.labels, [-1])
+            print("labels_vec", labels_vec.get_shape())
+            outputs_vec = tf.reshape(outputs, [-1])
+            print("outputs_vec", outputs_vec.get_shape())
+            loss = tf_losses.sigmoid_cross_entropy(outputs_vec, labels_vec)
+            #loss = tf.reduce_sum((tf.sigmoid(outputs_vec)-tf.cast(labels_vec, tf.float32))**2)
+            print("scalar", loss.get_shape())
+            self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
+            self.accuracy = tf.contrib.metrics.accuracy(self.predictions, self.labels)
             # rnn bunka implementovana dynamicky
             # while bunka v TF (iba s jednym TF node pre RNN) ... cele v
             # (outputs, state) tf.nn.dynamic_rnn (cell, inputs, seq_lens=None,
@@ -140,7 +155,7 @@ class Network:
             # self.training = ...
 
             self.dataset_name = tf.placeholder(tf.string, [])
-            self.summary = tf.scalar_summary(self.dataset_name+"/accuracy", accuracy)
+            self.summary = tf.scalar_summary(self.dataset_name+"/accuracy", self.accuracy)
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -150,15 +165,17 @@ class Network:
         return self.session.run(self.global_step)
 
     def train(self, sentences, sentence_lens, labels):
-        _, summary = self.session.run([self.training, self.summary],
+        _,acc, summary = self.session.run([self.training, self.accuracy, self.summary],
                                       {self.sentences: sentences, self.sentence_lens: sentence_lens,
                                        self.labels: labels, self.dataset_name: "train"})
         self.summary_writer.add_summary(summary, self.training_step)
+        return acc
 
     def evaluate(self, sentences, sentence_lens, labels, dataset_name):
-        summary = self.session.run(self.summary, {self.sentences: sentences, self.sentence_lens: sentence_lens,
+        acc, summary = self.session.run([self.accuracy, self.summary], {self.sentences: sentences, self.sentence_lens: sentence_lens,
                                                   self.labels: labels, self.dataset_name: dataset_name})
         self.summary_writer.add_summary(summary, self.training_step)
+        return acc
 
 
 if __name__ == "__main__":
