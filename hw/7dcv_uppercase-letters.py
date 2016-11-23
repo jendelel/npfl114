@@ -115,13 +115,11 @@ class Network:
             print("input_words", input_words.get_shape())
             print("outputs", outputs.get_shape())
             mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
-            unpacked = tf.unpack(outputs, axis=2)
-            masked = []
-            for i in range(len(unpacked)):
-                masked.append(mask*unpacked[i])
-            masked_pack = tf.pack(masked, axis=2)
-            print("masked", masked_pack.get_shape())
-            masked_vec = tf.reshape(masked_pack, [-1, rnn_cell_dim])
+            mask3d = tf.pack(np.repeat(mask, rnn_cell_dim).tolist(), axis=2)
+            print("mask3d", mask3d.get_shape())
+            masked = mask3d * outputs
+            print("masked", masked.get_shape())
+            masked_vec = tf.reshape(masked, [-1, rnn_cell_dim])
             print("masked_vec", masked_vec.get_shape())
             labels_vec = tf.reshape(self.labels, [-1])
             print("labels_vec", labels_vec.get_shape())
