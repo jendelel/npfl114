@@ -111,27 +111,24 @@ class Network:
            
             print("outputs_bw", outputs_bw.get_shape())
             print("outputs_fw", outputs_fw.get_shape())
-            outputs_fw = tf.reduce_sum(outputs_fw, 2)
-            outputs_bw = tf.reduce_sum(outputs_bw, 2)
-            print("outputs_bw", outputs_bw.get_shape())
-            print("outputs_fw", outputs_fw.get_shape())
-
+            outputs = outputs_fw + outputs_bw
             print("input_words", input_words.get_shape())
-            mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
-            masked_fw = mask*outputs_fw
-            masked_bw = mask*outputs_bw
-
-            outputs = masked_bw+masked_fw
             print("outputs", outputs.get_shape())
+            mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
+            masked = mask*outputs
+            print("masked", masked.get_shape())
+            masked_vec = tf.reshape(masked, [-1, rnn_cell_dim])
+            print("masked_vec", masked_vec.get_shape())
+            labels_vec = tf.reshape(self.labels, [-1, 1])
+            print("labels_vec", labels_vec.get_shape())
 
-            self.predictions = tf.cast(tf.round(tf.sigmoid(outputs)), tf.int64)
+            output_layer = tf_layers.fully_connected(masked_vec, 2)
+
+            print("output_layer", output_layer.get_shape())
+            self.predictions = tf.cast(tf.argmax(output_layer, 1),tf.int64)
             print("predictions", self.predictions.get_shape())
             print("labels", self.labels.get_shape())
-            labels_vec = tf.reshape(self.labels, [-1])
-            print("labels_vec", labels_vec.get_shape())
-            outputs_vec = tf.reshape(outputs, [-1])
-            print("outputs_vec", outputs_vec.get_shape())
-            loss = tf_losses.sigmoid_cross_entropy(outputs_vec, labels_vec)
+            loss = tf_losses.sparse_softmax_cross_entropy(output_layer, labels_vec)
             #loss = tf.reduce_sum((tf.sigmoid(outputs_vec)-tf.cast(labels_vec, tf.float32))**2)
             print("scalar", loss.get_shape())
             self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
