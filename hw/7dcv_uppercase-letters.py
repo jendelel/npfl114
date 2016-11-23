@@ -115,11 +115,15 @@ class Network:
             print("input_words", input_words.get_shape())
             print("outputs", outputs.get_shape())
             mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
-            masked = mask*outputs
-            print("masked", masked.get_shape())
-            masked_vec = tf.reshape(masked, [-1, rnn_cell_dim])
+            unpacked = tf.unpack(outputs, axis=2)
+            masked = []
+            for i in range(len(unpacked)):
+                masked.append(mask*unpacked[i])
+            masked_pack = tf.pack(masked, axis=2)
+            print("masked", masked_pack.get_shape())
+            masked_vec = tf.reshape(masked_pack, [-1, rnn_cell_dim])
             print("masked_vec", masked_vec.get_shape())
-            labels_vec = tf.reshape(self.labels, [-1, 1])
+            labels_vec = tf.reshape(self.labels, [-1])
             print("labels_vec", labels_vec.get_shape())
 
             output_layer = tf_layers.fully_connected(masked_vec, 2)
@@ -132,7 +136,7 @@ class Network:
             #loss = tf.reduce_sum((tf.sigmoid(outputs_vec)-tf.cast(labels_vec, tf.float32))**2)
             print("scalar", loss.get_shape())
             self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
-            self.accuracy = tf.contrib.metrics.accuracy(self.predictions, self.labels)
+            self.accuracy = tf.contrib.metrics.accuracy(self.predictions, labels_vec)
             # rnn bunka implementovana dynamicky
             # while bunka v TF (iba s jednym TF node pre RNN) ... cele v
             # (outputs, state) tf.nn.dynamic_rnn (cell, inputs, seq_lens=None,
