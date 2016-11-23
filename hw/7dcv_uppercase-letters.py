@@ -207,15 +207,21 @@ if __name__ == "__main__":
     data_test = Dataset(args.data_test, data_train.alphabet)
 
     # Construct the network
-    expname = "uppercase-letters-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
+    embedding_string = "embedding{}".format(args.embedding)
+    if args.embedding == -1: embedding_string = "one_hot"
+    expname = "uppercase-letters-{}{}-{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, embedding_string, args.batch_size, args.epochs)
     network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads)
 
     # Train
+    dev_acc = None
+    test_acc = None
     for epoch in range(args.epochs):
         print("Training epoch {}".format(epoch))
         while not data_train.epoch_finished():
             sentences, sentence_lens, labels = data_train.next_batch(args.batch_size)
             network.train(sentences, sentence_lens, labels)
 
-        network.evaluate(data_dev.sentences, data_dev.sentence_lens, data_dev.labels, "dev")
-        network.evaluate(data_test.sentences, data_test.sentence_lens, data_test.labels, "test")
+        dev_acc = network.evaluate(data_dev.sentences, data_dev.sentence_lens, data_dev.labels, "dev")
+        test_acc = network.evaluate(data_test.sentences, data_test.sentence_lens, data_test.labels, "test")
+
+    print("{}: dev_acc:{}, test_acc:{}".format(expname, dev_acc, test_acc))

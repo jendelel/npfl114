@@ -1,0 +1,46 @@
+input words (?, ?, 62)
+outputs_bw (?, ?, 8)
+outputs_fw (?, ?, 8)
+input_words (?, ?, 62)
+outputs (?, ?, 8)
+mask3d (?, ?, 8)
+masked (?, ?, 8)
+masked_vec (?, 8)
+labels_vec (?,)
+output_layer (?, 2)
+predictions (?,)
+labels (?, ?)
+scalar ()
+Training epoch 0
+Training epoch 1
+Training epoch 2
+Training epoch 3
+Training epoch 4
+Training epoch 5
+Training epoch 6
+Training epoch 7
+Training epoch 8
+Training epoch 9
+uppercase-letters-LSTM8-one_hot-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
+input words (?, ?, 62)
+outputs_bw (?, ?, 10)
+outputs_fw (?, ?, 10)
+input_words (?, ?, 62)
+outputs (?, ?, 10)
+mask3d (?, ?, 10)
+masked (?, ?, 10)
+masked_vec (?, 10)
+labels_vec (?,)
+output_layer (?, 2)
+predictions (?,)
+labels (?, ?)
+scalar ()
+Training epoch 0
+Training epoch 1
+Training epoch 2
+Training epoch 3
+Training epoch 4
+Training epoch 5
+Training epoch 6
+Training epoch 7
+Training epoch 8
