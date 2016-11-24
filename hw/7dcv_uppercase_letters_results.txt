@@ -1,46 +1,24 @@
-input words (?, ?, 62)
-outputs_bw (?, ?, 8)
-outputs_fw (?, ?, 8)
-input_words (?, ?, 62)
-outputs (?, ?, 8)
-mask3d (?, ?, 8)
-masked (?, ?, 8)
-masked_vec (?, 8)
-labels_vec (?,)
-output_layer (?, 2)
-predictions (?,)
-labels (?, ?)
-scalar ()
-Training epoch 0
-Training epoch 1
-Training epoch 2
-Training epoch 3
-Training epoch 4
-Training epoch 5
-Training epoch 6
-Training epoch 7
-Training epoch 8
-Training epoch 9
 uppercase-letters-LSTM8-one_hot-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
-input words (?, ?, 62)
-outputs_bw (?, ?, 10)
-outputs_fw (?, ?, 10)
-input_words (?, ?, 62)
-outputs (?, ?, 10)
-mask3d (?, ?, 10)
-masked (?, ?, 10)
-masked_vec (?, 10)
-labels_vec (?,)
-output_layer (?, 2)
-predictions (?,)
-labels (?, ?)
-scalar ()
-Training epoch 0
-Training epoch 1
-Training epoch 2
-Training epoch 3
-Training epoch 4
-Training epoch 5
-Training epoch 6
-Training epoch 7
-Training epoch 8
+uppercase-letters-LSTM10-one_hot-bs16-epochs10: dev_acc:0.978030323982, test_acc:0.977190256119
+uppercase-letters-LSTM12-one_hot-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
+uppercase-letters-LSTM8-embedding50-bs16-epochs10: dev_acc:0.980519473553, test_acc:0.980270385742
+uppercase-letters-LSTM10-embedding50-bs16-epochs10: dev_acc:0.981457412243, test_acc:0.980817914009
+uppercase-letters-LSTM12-embedding50-bs16-epochs10: dev_acc:0.981457412243, test_acc:0.980886399746
+uppercase-letters-LSTM8-embedding150-bs16-epochs10: dev_acc:0.981529593468, test_acc:0.980937719345
+uppercase-letters-LSTM10-embedding150-bs16-epochs10: dev_acc:0.981601715088, test_acc:0.981057465076
+uppercase-letters-LSTM12-embedding150-bs16-epochs10: dev_acc:0.98299062252, test_acc:0.982426404953
+uppercase-letters-LSTM8-embedding250-bs16-epochs10: dev_acc:0.981709957123, test_acc:0.98150241375
+uppercase-letters-LSTM10-embedding250-bs16-epochs10: dev_acc:0.981746017933, test_acc:0.981279969215
+uppercase-letters-LSTM12-embedding250-bs16-epochs10: dev_acc:0.98234128952, test_acc:0.982186853886
+uppercase-letters-GRU8-one_hot-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
+uppercase-letters-GRU10-one_hot-bs16-epochs10: dev_acc:0.981024503708, test_acc:0.980390131474
+uppercase-letters-GRU12-one_hot-bs16-epochs10: dev_acc:0.98151153326, test_acc:0.98102325201
+uppercase-letters-GRU8-embedding50-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
+uppercase-letters-GRU10-embedding50-bs16-epochs10: dev_acc:0.982503592968, test_acc:0.98249489069
+uppercase-letters-GRU12-embedding50-bs16-epochs10: dev_acc:0.982882380486, test_acc:0.982631742954
+uppercase-letters-GRU8-embedding150-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969216287136
+uppercase-letters-GRU10-embedding150-bs16-epochs10: dev_acc:0.982828259468, test_acc:0.983042418957
+uppercase-letters-GRU12-embedding150-bs16-epochs10: dev_acc:0.983603894711, test_acc:0.983162224293
+uppercase-letters-GRU8-embedding250-bs16-epochs10: dev_acc:0.970454573631, test_acc:0.96952432394
+uppercase-letters-GRU10-embedding250-bs16-epochs10: dev_acc:0.982575774193, test_acc:0.981861710548
+uppercase-letters-GRU12-embedding250-bs16-epochs10: dev_acc:0.969859302044, test_acc:0.969079375267
