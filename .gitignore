@@ -3,3 +3,4 @@ logs/
 .idea/
 *.iml
 *.zip
+.__afs*
