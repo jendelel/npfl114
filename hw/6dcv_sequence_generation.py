@@ -55,7 +55,7 @@ class Network:
             # Potreba pridat tf.pack na output_list a zavolat spravnou loss function s MSE
             predictions_list = list(output_list)
             predictions = tf.pack(predictions_list) # "concat python list of tensors to a single tensor with one dimension extra"
-            loss = tf.reduce_mean(predictions-self.data)**2
+            loss = tf.reduce_mean((predictions-self.data)**2)
             self.training = tf.train.AdamOptimizer().minimize(loss, global_step=self.global_step)
 
             for i in range(self.TRAIN, self.TEST+self.TRAIN):
