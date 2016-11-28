@@ -119,17 +119,18 @@ class Network:
             outputs = outputs_fw + outputs_bw
             print("input_words", input_words.get_shape())
             print("outputs", outputs.get_shape())
-            mask = tf.cast(tf.sequence_mask(self.sentence_lens), tf.float32)
+            mask = tf.sequence_mask(self.sentence_lens)
             mask3d = tf.pack(np.repeat(mask, rnn_cell_dim).tolist(), axis=2)
             print("mask3d", mask3d.get_shape())
-            masked = mask3d * outputs
+            masked = tf.boolean_mask(outputs, mask3d)
             print("masked", masked.get_shape())
-            masked_vec = tf.reshape(masked, [-1, rnn_cell_dim])
-            print("masked_vec", masked_vec.get_shape())
-            labels_vec = tf.reshape(self.labels, [-1])
+            masked_mat = tf.pack(tf.split(0, rnn_cell_dim, masked), axis=1)
+            print("masked_mat", masked_mat.get_shape())
+            labels_vec = tf.boolean_mask(self.labels, mask)
             print("labels_vec", labels_vec.get_shape())
 
-            output_layer = tf_layers.fully_connected(masked_vec, 2)
+            hidden_layer = tf_layers.fully_connected(masked_mat, 300)
+            output_layer = tf_layers.fully_connected(hidden_layer, 2)
 
             print("output_layer", output_layer.get_shape())
             self.predictions = tf.cast(tf.argmax(output_layer, 1),tf.int64)
