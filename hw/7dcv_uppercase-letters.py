@@ -105,6 +105,7 @@ class Network:
             self.sentences = tf.placeholder(tf.int32, [None, None])
             self.sentence_lens = tf.placeholder(tf.int32, [None])
             self.labels = tf.placeholder(tf.int64, [None, None])
+            self.is_training = tf.placeholder_with_default(False, [])
             
             input_words=None
             if embedding_dim == -1:
@@ -112,28 +113,35 @@ class Network:
             else:
                 input_words = tf.nn.embedding_lookup(tf.get_variable("alpha_emb", shape=[alphabet_size, embedding_dim]), self.sentences)
             print("input words", input_words.get_shape())
+
             (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words, self.sentence_lens, dtype=tf.float32)
-           
             print("outputs_bw", outputs_bw.get_shape())
             print("outputs_fw", outputs_fw.get_shape())
             outputs = outputs_fw + outputs_bw
-            print("input_words", input_words.get_shape())
             print("outputs", outputs.get_shape())
+            outputs_tr = tf.transpose(outputs, perm=[2, 1, 0])
+            print("outputs_tr", outputs_tr.get_shape())
+
             mask = tf.sequence_mask(self.sentence_lens)
+            print("mask", mask.get_shape())
             mask3d = tf.pack(np.repeat(mask, rnn_cell_dim).tolist(), axis=2)
             print("mask3d", mask3d.get_shape())
+            mask3d_tr = tf.transpose(mask3d, perm=[2, 1, 0])
+            print("mask3d_tr", mask3d_tr.get_shape())
             masked = tf.boolean_mask(outputs, mask3d)
             print("masked", masked.get_shape())
-            masked_mat = tf.pack(tf.split(0, rnn_cell_dim, masked), axis=1)
+            masked_mat = tf.reshape(masked, [-1, rnn_cell_dim])
+            # masked_mat = tf.pack(tf.split_v(masked, rnn_cell_dim), axis=1)
             print("masked_mat", masked_mat.get_shape())
             labels_vec = tf.boolean_mask(self.labels, mask)
             print("labels_vec", labels_vec.get_shape())
 
             hidden_layer = tf_layers.fully_connected(masked_mat, 300)
-            output_layer = tf_layers.fully_connected(hidden_layer, 2)
+            dropout = tf_layers.dropout(hidden_layer, keep_prob=0.5, is_training=self.is_training)
+            output_layer = tf_layers.fully_connected(dropout, 2)
 
             print("output_layer", output_layer.get_shape())
-            self.predictions = tf.cast(tf.argmax(output_layer, 1),tf.int64)
+            self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int64)
             print("predictions", self.predictions.get_shape())
             print("labels", self.labels.get_shape())
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, labels_vec)
@@ -155,24 +163,20 @@ class Network:
             # Orezani outputs
             # tf.sequence_mask(sequence_lengths, max_seq_length) to float (tf.cast) and multiply!
 
-            # TODO
-            # accuracy = ...
-            # self.training = ...
-
             self.dataset_name = tf.placeholder(tf.string, [])
             self.summary = tf.scalar_summary(self.dataset_name+"/accuracy", self.accuracy)
 
             # Initialize variables
-            self.session.run(tf.initialize_all_variables())
+            self.session.run(tf.global_variables_initializer())
 
     @property
     def training_step(self):
         return self.session.run(self.global_step)
 
     def train(self, sentences, sentence_lens, labels):
-        _,acc, summary = self.session.run([self.training, self.accuracy, self.summary],
+        _, acc, summary = self.session.run([self.training, self.accuracy, self.summary],
                                       {self.sentences: sentences, self.sentence_lens: sentence_lens,
-                                       self.labels: labels, self.dataset_name: "train"})
+                                       self.labels: labels, self.dataset_name: "train", self.is_training: True})
         self.summary_writer.add_summary(summary, self.training_step)
         return acc
 
