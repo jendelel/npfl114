@@ -106,7 +106,7 @@ class Network:
             self.sentence_lens = tf.placeholder(tf.int32, [None])
             self.labels = tf.placeholder(tf.int64, [None, None])
             self.is_training = tf.placeholder_with_default(False, [])
-            
+
             input_words=None
             if embedding_dim == -1:
                 input_words = tf.one_hot(self.sentences, alphabet_size)
@@ -128,7 +128,7 @@ class Network:
             print("mask3d", mask3d.get_shape())
             mask3d_tr = tf.transpose(mask3d, perm=[2, 1, 0])
             print("mask3d_tr", mask3d_tr.get_shape())
-            masked = tf.boolean_mask(outputs, mask3d)
+            masked = tf.boolean_mask(outputs_tr, mask3d_tr)
             print("masked", masked.get_shape())
             masked_mat = tf.reshape(masked, [-1, rnn_cell_dim])
             # masked_mat = tf.pack(tf.split_v(masked, rnn_cell_dim), axis=1)
