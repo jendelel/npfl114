@@ -82,7 +82,7 @@ class Dataset:
 
 
 class Network:
-    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, embedding_dim, logdir, expname, dropout_keep, threads=1, seed=42):
+    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, embedding_dim, logdir, expname, threads=1, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -132,8 +132,7 @@ class Network:
             print("labels_vec", labels_vec.get_shape())
 
             hidden_layer = tf_layers.fully_connected(masked_mat, 300)
-            dropout = tf_layers.dropout(hidden_layer, keep_prob=dropout_keep, is_training=self.is_training)
-            output_layer = tf_layers.fully_connected(dropout, 2)
+            output_layer = tf_layers.fully_connected(hidden_layer, 2)
 
             print("output_layer", output_layer.get_shape())
             self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int64)
@@ -199,7 +198,6 @@ if __name__ == "__main__":
     parser.add_argument("--rnn_cell_dim", default=10, type=int, help="RNN cell dimension.")
     parser.add_argument("--embedding", default=150, type=int, help="Embedding dimension. If -1, one_hot is used.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-    parser.add_argument("--dropout", default=1.0, type=float, help="Dropout probability.")
     args = parser.parse_args()
 
     # Load the data
@@ -211,7 +209,7 @@ if __name__ == "__main__":
     embedding_string = "embedding{}".format(args.embedding)
     if args.embedding == -1: embedding_string = "one_hot"
     expname = "uppercase-letters-{}{}-{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, embedding_string, args.batch_size, args.epochs)
-    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads, dropout_keep=args.dropout)
+    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads)
 
     # Train
     dev_acc = None
