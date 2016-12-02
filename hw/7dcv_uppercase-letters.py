@@ -82,7 +82,7 @@ class Dataset:
 
 
 class Network:
-    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, embedding_dim, logdir, expname, threads=1, seed=42):
+    def __init__(self, alphabet_size, rnn_cell, rnn_cell_dim, embedding_dim, logdir, expname, dropout_keep, threads=1, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -119,25 +119,20 @@ class Network:
             print("outputs_fw", outputs_fw.get_shape())
             outputs = outputs_fw + outputs_bw
             print("outputs", outputs.get_shape())
-            outputs_tr = tf.transpose(outputs, perm=[2, 1, 0])
-            print("outputs_tr", outputs_tr.get_shape())
 
             mask = tf.sequence_mask(self.sentence_lens)
             print("mask", mask.get_shape())
             mask3d = tf.pack(np.repeat(mask, rnn_cell_dim).tolist(), axis=2)
             print("mask3d", mask3d.get_shape())
-            mask3d_tr = tf.transpose(mask3d, perm=[2, 1, 0])
-            print("mask3d_tr", mask3d_tr.get_shape())
-            masked = tf.boolean_mask(outputs_tr, mask3d_tr)
+            masked = tf.boolean_mask(outputs, mask3d)
             print("masked", masked.get_shape())
             masked_mat = tf.reshape(masked, [-1, rnn_cell_dim])
-            # masked_mat = tf.pack(tf.split_v(masked, rnn_cell_dim), axis=1)
             print("masked_mat", masked_mat.get_shape())
             labels_vec = tf.boolean_mask(self.labels, mask)
             print("labels_vec", labels_vec.get_shape())
 
             hidden_layer = tf_layers.fully_connected(masked_mat, 300)
-            dropout = tf_layers.dropout(hidden_layer, keep_prob=0.5, is_training=self.is_training)
+            dropout = tf_layers.dropout(hidden_layer, keep_prob=dropout_keep, is_training=self.is_training)
             output_layer = tf_layers.fully_connected(dropout, 2)
 
             print("output_layer", output_layer.get_shape())
@@ -204,6 +199,7 @@ if __name__ == "__main__":
     parser.add_argument("--rnn_cell_dim", default=10, type=int, help="RNN cell dimension.")
     parser.add_argument("--embedding", default=150, type=int, help="Embedding dimension. If -1, one_hot is used.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--dropout", default=1.0, type=float, help="Dropout probability.")
     args = parser.parse_args()
 
     # Load the data
@@ -215,7 +211,7 @@ if __name__ == "__main__":
     embedding_string = "embedding{}".format(args.embedding)
     if args.embedding == -1: embedding_string = "one_hot"
     expname = "uppercase-letters-{}{}-{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, embedding_string, args.batch_size, args.epochs)
-    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads)
+    network = Network(alphabet_size=len(data_train.alphabet), rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim, embedding_dim=args.embedding, logdir=args.logdir, expname=expname, threads=args.threads, dropout_keep=args.dropout)
 
     # Train
     dev_acc = None
