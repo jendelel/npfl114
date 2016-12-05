@@ -1,0 +1,25 @@
+= NLI 2013
+
+== Hints
+
+* Spelling errors
+** Char-level WEmbedding
+** Pak word-level embedding in text... state nestaci.
+** Ideas (kvazi residual connections):
+*** Classification per-word (absencia contextu)
+*** Alebo classification per-sentence
+** Convolution:
+*** Input? Bidi-RNN for Char-level wembedding
+*** Velkost inputu?
+**** Pustit dynamicky tolkokrat kym nebude size==1
+** Complex:
+*** RNN
+*** Conv
+*** RNN
+*** Conv
+*** ...
+
+
+* Conv:
+** Weight decay.. stabilizes training of CNN (regularization) ... L2 reg.
+*** `variable_scope(..., regularizer=...)`
