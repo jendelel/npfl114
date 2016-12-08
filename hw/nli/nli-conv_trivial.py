@@ -80,14 +80,14 @@ class Network:
             conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=32, kernel_size=3, stride=1,
                                              activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
 
-            mp_1 = self._max_pool(conv_2, 4, 2)
+            mp_1 = self._max_pool(conv_2 + conv_1, 4, 2)
 
             # essay_max_len/2 (~80) x rnn_dim/2 x 32
             conv_3 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=3, stride=1,
                                              activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
             conv_4 = tf_layers.convolution2d(inputs=conv_3, num_outputs=64, kernel_size=3, stride=1,
                                              activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_2 = self._max_pool(conv_4, 4, 2)
+            mp_2 = self._max_pool(conv_4 + conv_3, 4, 2)
 
             print("mp_2", mp_2.get_shape())
 
@@ -96,7 +96,7 @@ class Network:
                                              activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
             conv_6 = tf_layers.convolution2d(inputs=conv_5, num_outputs=128, kernel_size=3, stride=1,
                                              activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_3 = self._max_pool(conv_6, 2, 2)
+            mp_3 = self._max_pool(conv_6 + conv_5, 2, 2)
             print("mp_3", mp_3.get_shape())
 
             _, state = tf.nn.dynamic_rnn(rnn_cell, mp_3, dtype=tf.float32, scope="rnn2")
