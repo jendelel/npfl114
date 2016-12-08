@@ -27,7 +27,7 @@ class Network:
             print("mp_post", mp_post.get_shape())
             return mp_post
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=-1, keep_prob=0.5):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=-1, keep_prob=0.8):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -41,8 +41,10 @@ class Network:
         with self.session.graph.as_default():
             if rnn_cell == "LSTM":
                 rnn_cell = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
+                rnn_cell2 = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim*2)
             elif rnn_cell == "GRU":
                 rnn_cell = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
+                rnn_cell2 = tf.nn.rnn_cell.GRUCell(rnn_cell_dim * 2)
             else:
                 raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
 
@@ -62,61 +64,20 @@ class Network:
                                                      self.word_ids)
             print("input words", input_words.get_shape())
 
-            (outputs_fw, outputs_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words,
+            shape = None
+            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words,
                                                                           self.sentence_lens, dtype=tf.float32)
-            # print("state_bw", state_bw.get_shape())
-            # print("state_fw", state_fw.get_shape())
-            # state = state_bw + state_fw
+            outputs_old = tf.concat(2, [outputs_bw, outputs_fw])
+            outputs, state = tf.nn.dynamic_rnn(rnn_cell2, outputs_old, shape, dtype=tf.float32, scope="rnn1")
+            for i in range(2, 5+1):
+                tmp, state = tf.nn.dynamic_rnn(rnn_cell2, outputs+outputs_old, shape, dtype=tf.float32, scope="rnn" + str(i))
+                outputs_old = outputs
+                outputs = tmp
 
-            print("outputs_bw", outputs_bw.get_shape())
-            print("outputs_fw", outputs_fw.get_shape())
+            fc = tf_layers.fully_connected(inputs=state, num_outputs=1024, activation_fn=tf.nn.relu)
+            fc_drop = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
 
-            outputs = tf.concat(2, [outputs_fw, outputs_bw])
-            print("outputs", outputs.get_shape())
-
-            # essay_max_len(~320) x 2*rnn_dim
-            conv_1 = tf_layers.convolution2d(inputs=outputs, num_outputs=32, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=32, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-
-            mp_1 = self._max_pool(conv_2, 4, 2)
-
-            # essay_max_len/2 (~80) x rnn_dim/2 x 32
-            conv_3 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_4 = tf_layers.convolution2d(inputs=conv_3, num_outputs=64, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_2 = self._max_pool(conv_4, 4, 2)
-
-            print("mp_2", mp_2.get_shape())
-
-            # essay_max_len/4 (~20) x rnn_dim/4 (~25) x 64
-            conv_5 = tf_layers.convolution2d(inputs=mp_2, num_outputs=128, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            conv_6 = tf_layers.convolution2d(inputs=conv_5, num_outputs=128, kernel_size=3, stride=1,
-                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            mp_3 = self._max_pool(conv_6, 2, 2)
-            print("mp_3", mp_3.get_shape())
-
-            seq_lens = tf.shape(mp_3)[1]
-            print("seq_lens", seq_lens)
-            seq_lens = tf.fill([tf.shape(input_words)[0]], seq_lens)
-            print("seq_lens", seq_lens)
-            print("seq_lens", seq_lens.get_shape())
-            (outputs2_fw, outputs2_bw), (state2_fw, state2_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell,
-                                                                                             mp_3, dtype=tf.float32, scope="rnn2",
-                                                                                                 sequence_length=seq_lens)
-
-            packed_state = tf.concat(1, [state2_fw, state2_bw])
-            print("packed_state", packed_state.get_shape())
-            # flatten = tf_layers.flatten()
-            # print("flatten", flatten.get_shape())
-            fc_drop_1 = tf_layers.dropout(packed_state, keep_prob=keep_prob, is_training=self.is_training)
-            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
-            fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
-
-            output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
+            output_layer = tf_layers.fully_connected(fc_drop, num_outputs=self.LANGUAGES)
             print("output_layer", output_layer.get_shape())
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
@@ -189,7 +150,7 @@ if __name__ == "__main__":
     expname = "nli-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads, batch_size=args.batch_size,
+                      logdir=args.logdir, expname=expname, threads=args.threads,
                       word_embedding=args.word_embedding)
 
     # Train

@@ -60,7 +60,10 @@ class Network:
             else:
                 input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
                                                      self.word_ids)
+
             print("input words", input_words.get_shape())
+            padded = tf.pad(input_words, tf.constant([0, ]), "CONSTANT")
+            print("padded", padded.get_shape())
 
             (outputs_fw, outputs_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words,
                                                                           self.sentence_lens, dtype=tf.float32)
@@ -99,20 +102,13 @@ class Network:
             mp_3 = self._max_pool(conv_6, 2, 2)
             print("mp_3", mp_3.get_shape())
 
-            seq_lens = tf.shape(mp_3)[1]
-            print("seq_lens", seq_lens)
-            seq_lens = tf.fill([tf.shape(input_words)[0]], seq_lens)
-            print("seq_lens", seq_lens)
-            print("seq_lens", seq_lens.get_shape())
-            (outputs2_fw, outputs2_bw), (state2_fw, state2_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell,
-                                                                                             mp_3, dtype=tf.float32, scope="rnn2",
-                                                                                                 sequence_length=seq_lens)
+            # essay_max_len/8 (~10) x rnn_dim/8 (~12) x 128
 
-            packed_state = tf.concat(1, [state2_fw, state2_bw])
-            print("packed_state", packed_state.get_shape())
+            flatten = tf.reduce_max(mp_3, axis=1)
+            print("flatten", flatten.get_shape())
             # flatten = tf_layers.flatten()
             # print("flatten", flatten.get_shape())
-            fc_drop_1 = tf_layers.dropout(packed_state, keep_prob=keep_prob, is_training=self.is_training)
+            fc_drop_1 = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
             fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
             fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
 
@@ -189,7 +185,7 @@ if __name__ == "__main__":
     expname = "nli-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads, batch_size=args.batch_size,
+                      logdir=args.logdir, expname=expname, threads=args.threads,
                       word_embedding=args.word_embedding)
 
     # Train
