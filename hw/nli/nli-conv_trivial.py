@@ -120,7 +120,7 @@ class Network:
                                              tf.scalar_summary(self.dataset_name+"/accuracy", self.accuracy)])
 
             # Initialize variables
-            self.session.run(tf.global_variables_initializer())
+            self.session.run(tf.initialize_all_variables())
 
     @property
     def training_step(self):
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     expname = "nli-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads, batch_size=args.batch_size,
+                      logdir=args.logdir, expname=expname, threads=args.threads, 
                       word_embedding=args.word_embedding)
 
     # Train
