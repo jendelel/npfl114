@@ -18,7 +18,7 @@ import nli_dataset
 class Network:
     LANGUAGES = 11
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=-1, keep_prob=0.5):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, batch_size, threads=1, seed=42, word_embedding=-1, keep_prob=0.5):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -55,48 +55,54 @@ class Network:
 
             (outputs_fw, outputs_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell, input_words,
                                                                           self.sentence_lens, dtype=tf.float32)
-            print("state_bw", state_bw.get_shape())
-            print("state_fw", state_fw.get_shape())
-            state = state_bw + state_fw
-            hidden = tf_layers.fully_connected(state, num_outputs=300)
-            output_layer = tf_layers.fully_connected(hidden, num_outputs=self.LANGUAGES)
+            # print("state_bw", state_bw.get_shape())
+            # print("state_fw", state_fw.get_shape())
+            # state = state_bw + state_fw
 
             print("outputs_bw", outputs_bw.get_shape())
             print("outputs_fw", outputs_fw.get_shape())
 
-            # outputs = outputs_fw + outputs_bw
-            # print("outputs", outputs.get_shape())
+            outputs = tf.pack([outputs_fw, outputs_bw], axis=3)
+            print("outputs", outputs.get_shape())
 
-            # mask = tf.sequence_mask(self.sentence_lens)
-            # print("mask", mask.get_shape())
-            # mask3d = tf.pack(np.repeat(mask, rnn_cell_dim).tolist(), axis=2)
-            # print("mask3d", mask3d.get_shape())
-            # masked = tf.boolean_mask(outputs, mask3d)
-            # print("masked", masked.get_shape())
-            # masked_mat = tf.reshape(masked, [-1, rnn_cell_dim])
-            # print("masked_mat", masked_mat.get_shape())
-            #
-            # # 28x28x1
-            # conv_1 = tf_layers.convolution2d(inputs=masked_mat, num_outputs=32, kernel_size=3, stride=1,
-            #                                  activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            # conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=32, kernel_size=3, stride=1,
-            #                                  activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            # mp_1 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=2, stride=2)
-            # conv_3 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=3, stride=1,
-            #                                  activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            # conv_4 = tf_layers.convolution2d(inputs=conv_3, num_outputs=64, kernel_size=3, stride=1,
-            #                                  activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            # conv_5 = tf_layers.convolution2d(inputs=conv_4, num_outputs=64, kernel_size=3, stride=1,
-            #                                  activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
-            # mp_2 = tf_layers.max_pool2d(inputs=conv_5, kernel_size=2, stride=2)
-            # flatten = tf_layers.flatten(mp_2)
-            # fc_drop_1 = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
-            # fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
-            # fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
-            #
-            # output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
-            # convolution
+            # essay_max_len(~320) x rnn_dim x 2
+            conv_1 = tf_layers.convolution2d(inputs=outputs, num_outputs=32, kernel_size=[3, rnn_cell_dim], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=32, kernel_size=[3, rnn_cell_dim], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_1 = tf_layers.max_pool2d(inputs=conv_2, kernel_size=[4, 2], stride=2)
 
+            print("mp_1", mp_1.get_shape())
+
+            # essay_max_len/2 (~80) x rnn_dim/2 x 32
+            conv_3 = tf_layers.convolution2d(inputs=mp_1, num_outputs=64, kernel_size=[3, rnn_cell_dim/2], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            conv_4 = tf_layers.convolution2d(inputs=conv_3, num_outputs=64, kernel_size=[3, rnn_cell_dim/2], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_2 = tf_layers.max_pool2d(inputs=conv_4, kernel_size=[4, 4], stride=2)
+
+            print("mp_2", mp_2.get_shape())
+
+            # essay_max_len/4 (~20) x rnn_dim/4 (~25) x 64
+            conv_5 = tf_layers.convolution2d(inputs=mp_2, num_outputs=128, kernel_size=[3, rnn_cell_dim/4], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            conv_6 = tf_layers.convolution2d(inputs=conv_5, num_outputs=128, kernel_size=[3, rnn_cell_dim/4], stride=1,
+                                             activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm)
+            mp_3 = tf_layers.max_pool2d(inputs=conv_6, kernel_size=[2, 5], stride=2)
+            print("mp_3", mp_3.get_shape())
+
+            (outputs2_fw, outputs2_bw), (state2_fw, state2_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell,
+                                                                                             mp_3, dtype=tf.float32)
+
+            packed_state = tf.pack([state2_fw, state2_bw], axis=2)
+            print("packed_state", packed_state.get_shape())
+            # flatten = tf_layers.flatten()
+            # print("flatten", flatten.get_shape())
+            fc_drop_1 = tf_layers.dropout(packed_state, keep_prob=keep_prob, is_training=self.is_training)
+            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
+            fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
+
+            output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
             print("output_layer", output_layer.get_shape())
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
@@ -167,7 +173,7 @@ if __name__ == "__main__":
     expname = "nli-{}{}-bs{}-epochs{}".format(args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads)
+                      logdir=args.logdir, expname=expname, threads=args.threads, batch_size=args.batch_size)
 
     # Train
     best_dev_accuracy = 0
