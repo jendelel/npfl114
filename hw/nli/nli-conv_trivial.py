@@ -99,21 +99,12 @@ class Network:
             mp_3 = self._max_pool(conv_6, 2, 2)
             print("mp_3", mp_3.get_shape())
 
-            seq_lens = tf.shape(mp_3)[1]
-            print("seq_lens", seq_lens)
-            seq_lens = tf.fill([tf.shape(input_words)[0]], seq_lens)
-            print("seq_lens", seq_lens)
-            print("seq_lens", seq_lens.get_shape())
-            (outputs2_fw, outputs2_bw), (state2_fw, state2_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell, rnn_cell,
-                                                                                             mp_3, dtype=tf.float32, scope="rnn2",
-                                                                                                 sequence_length=seq_lens)
+            _, state = tf.nn.dynamic_rnn(rnn_cell, mp_3, dtype=tf.float32, scope="rnn2")
 
-            packed_state = tf.concat(1, [state2_fw, state2_bw])
-            print("packed_state", packed_state.get_shape())
+            print("state", state.get_shape())
             # flatten = tf_layers.flatten()
             # print("flatten", flatten.get_shape())
-            fc_drop_1 = tf_layers.dropout(packed_state, keep_prob=keep_prob, is_training=self.is_training)
-            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
+            fc = tf_layers.fully_connected(inputs=state, num_outputs=1024, activation_fn=tf.nn.relu)
             fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
 
             output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
