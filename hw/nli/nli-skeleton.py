@@ -4,12 +4,13 @@ from __future__ import division
 from __future__ import print_function
 
 import datetime
-import numpy as np
 import sys
+
+import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.layers as tf_layers
 
 import nli_dataset
+
 
 class Network:
     LANGUAGES = 11
