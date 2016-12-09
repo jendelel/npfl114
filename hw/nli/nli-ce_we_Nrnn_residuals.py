@@ -37,7 +37,7 @@ class Network:
             print("Conv:", conv_2.get_shape())
             return conv_2
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.8):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.8, rnn_num=0):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -107,7 +107,7 @@ class Network:
             shape = None
             outputs_old = outputs
             outputs, state = tf.nn.dynamic_rnn(rnn_cell_co2, outputs_old, shape, dtype=tf.float32, scope="rnn1")
-            for i in range(2, 1 + 1):
+            for i in range(2, 2 + rnn_num):
                 tmp, state = tf.nn.dynamic_rnn(rnn_cell_co2, outputs + outputs_old, shape, dtype=tf.float32,
                                                scope="rnn" + str(i))
                 outputs_old = outputs
@@ -182,6 +182,8 @@ if __name__ == "__main__":
     parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--word_embedding", default=100, type=int, help="word_embedding")
     parser.add_argument("--char_embedding", default=100, type=int, help="char_embedding")
+    parser.add_argument("--rnn_num", default=0, type=int, help="number of rnns")
+    parser.add_argument("--keep_prob", default=0.8, type=float, help="dropout keep prob")
 
     args = parser.parse_args()
 
@@ -193,11 +195,11 @@ if __name__ == "__main__":
 
     # Construct the network
     print("Constructing the network.", file=sys.stderr)
-    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding)
+    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}-rnn{}-drop{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding, args.rnn_num, args.keep_prob)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads,
-                      word_embedding=args.word_embedding, char_embedding=args.char_embedding)
+                      logdir=args.logdir, expname=expname, threads=args.threads, keep_prob=args.keep_prob,
+                      word_embedding=args.word_embedding, char_embedding=args.char_embedding, rnn_num=args.rnn_num)
 
     # Train
     best_dev_accuracy = 0
