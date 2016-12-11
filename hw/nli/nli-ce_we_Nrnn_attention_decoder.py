@@ -110,9 +110,12 @@ class Network:
             dec_inputs = tf.zeros_like(state_fw) 
             print("dec_inputs", dec_inputs.get_shape())
 
-            dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs, dec_inputs, dec_inputs], state_fw+state_bw, outputs, rnn_cell_co)
-            outputs = tf.pack(dec_outputs, axis=1)
-            print("outputs", outputs.get_shape())
+            def loop_fn(prev, i):
+                return prev
+
+            dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw+state_bw, outputs, rnn_cell_co, loop_function=loop_fn, output_size=self.LANGUAGES)
+            # outputs = tf.pack(dec_outputs, axis=1)
+            # print("outputs", outputs.get_shape())
 
             # gruCell_fn = tf.contrib.grid_rnn.Grid2GRUCell
             # cell = gruCell_fn(word_embedding+char_embedding)
@@ -129,15 +132,16 @@ class Network:
 
             #outputs += outputs_old  # Residuals
             #print("outputs", outputs.get_shape())
-            flattened = tf_layers.flatten(outputs)
-            print("flattened", flattened.get_shape())
+            #flattened = tf_layers.flatten(outputs)
+            #print("flattened", flattened.get_shape())
 
-            fc_drop_1 = tf_layers.dropout(flattened, keep_prob=keep_prob, is_training=self.is_training)
-            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
-            fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
+            #fc_drop_1 = tf_layers.dropout(flattened, keep_prob=keep_prob, is_training=self.is_training)
+            #fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
+            #fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
 
-            output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
-            print("output_layer", output_layer.get_shape())
+            #output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
+            output_layer = dec_outputs[0]
+            #print("output_layer", output_layer.get_shape())
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
             self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
