@@ -55,6 +55,8 @@ class Network:
             elif rnn_cell == "GRU":
                 rnn_cell_co = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
                 rnn_cell_co2 = tf.nn.rnn_cell.GRUCell(word_embedding+char_embedding)
+            elif rnn_cell == "GRUGRID":
+                rnn_cell_co = tf.contrib.rnn.Grid2GRUCell
             else:
                 raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
 
@@ -67,6 +69,8 @@ class Network:
             self.languages = tf.placeholder(tf.int32, [None])
             self.is_training = tf.placeholder_with_default(False, [])
 
+            
+            # charseqs je matice [batch x id charakteru]
             if char_embedding == -1:
                 input_chars = tf.one_hot(self.charseqs, num_chars)
             else:
@@ -97,33 +101,49 @@ class Network:
             input_concat = tf.concat(2, [input_char_words, input_words])
             print("input_concat", input_concat.get_shape())
 
-            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_concat,
+            (outputs_fw, outputs_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_concat,
                                                                           self.sentence_lens, dtype=tf.float32, scope="rnn_words")
             print("outputs_bw", outputs_bw.get_shape())
             print("outputs_fw", outputs_fw.get_shape())
             outputs = tf.concat(2, [outputs_fw, outputs_bw])
             print("outputs", outputs.get_shape())
+        
+            print(tf.shape(state_fw)[0])
+            dec_inputs = tf.zeros_like(state_fw) 
+            print("dec_inputs", dec_inputs.get_shape())
 
-            shape = None
-            outputs_old = outputs
-            outputs, state = tf.nn.dynamic_rnn(rnn_cell_co2, outputs_old, shape, dtype=tf.float32, scope="rnn1")
-            for i in range(2, 2 + rnn_num):
-                tmp, state = tf.nn.dynamic_rnn(rnn_cell_co2, outputs + outputs_old, shape, dtype=tf.float32,
-                                               scope="rnn" + str(i))
-                outputs_old = outputs
-                outputs = tmp
+            def loop_fn(prev, i):
+                return prev
 
-            outputs += outputs_old  # Residuals
-            print("outputs", outputs.get_shape())
-            flattened = tf.reduce_max(outputs, axis=1)
-            print("flattened", flattened.get_shape())
+            dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw+state_bw, outputs, rnn_cell_co, loop_function=loop_fn, output_size=self.LANGUAGES)
+            # outputs = tf.pack(dec_outputs, axis=1)
+            # print("outputs", outputs.get_shape())
 
-            fc_drop_1 = tf_layers.dropout(flattened, keep_prob=keep_prob, is_training=self.is_training)
-            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
-            fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
+            # gruCell_fn = tf.contrib.grid_rnn.Grid2GRUCell
+            # cell = gruCell_fn(word_embedding+char_embedding)
+            # cell = tf.nn.rnn_cell.MultiRNNCell([cell])
 
-            output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
-            print("output_layer", output_layer.get_shape())
+            #shape = None
+            #outputs_old = outputs
+            #outputs, state = tf.nn.dynamic_rnn(gruCell_fn, outputs_old, shape, dtype=tf.float32, scope="rnn1")
+            #for i in range(2, 2 + rnn_num):
+            #    tmp, state = tf.nn.dynamic_rnn(cell, outputs + outputs_old, shape, dtype=tf.float32,
+            #                                   scope="rnn" + str(i))
+            #    outputs_old = outputs
+            #    outputs = tmp
+
+            #outputs += outputs_old  # Residuals
+            #print("outputs", outputs.get_shape())
+            #flattened = tf_layers.flatten(outputs)
+            #print("flattened", flattened.get_shape())
+
+            #fc_drop_1 = tf_layers.dropout(flattened, keep_prob=keep_prob, is_training=self.is_training)
+            #fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
+            #fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
+
+            #output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
+            output_layer = dec_outputs[0]
+            #print("output_layer", output_layer.get_shape())
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
             self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
