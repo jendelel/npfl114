@@ -97,7 +97,7 @@ class Network:
             print("input_words", input_words.get_shape())
             input_tags = tf.nn.embedding_lookup(tf.get_variable("tag_emb", shape=[num_words, word_embedding]),
                                                  self.tags)
-            input_concat = tf.concat(2, [input_char_words, input_words, input_tags])
+            input_concat = tf.concat(2, [input_char_words, input_words])  # input_tags])
             print("input_concat", input_concat.get_shape())
 
             (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_concat,
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=100, type=int, help="Batch size.")
+    parser.add_argument("--batch_size", default=500, type=int, help="Batch size.")
     parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
