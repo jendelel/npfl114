@@ -97,12 +97,26 @@ class Network:
             print("input_words", input_words.get_shape())
             input_tags = tf.nn.embedding_lookup(tf.get_variable("tag_emb", shape=[num_words, word_embedding]),
                                                  self.tags)
-            input_concat = tf.concat(2, [input_char_words, input_words, input_tags])
+            input_concat = tf.concat(2, [input_char_words, input_words])  # input_tags])
             print("input_concat", input_concat.get_shape())
 
-            _, state = tf.nn.dynamic_rnn(rnn_cell_co, input_words, self.sentence_lens, dtype=tf.float32, scope="rnn_words")
-            print("state", state.get_shape())
-            output_layer = tf_layers.fully_connected(tf_layers.flatten(state), num_outputs=self.LANGUAGES)
+            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_concat,
+                                                                          self.sentence_lens, dtype=tf.float32,
+                                                                          scope="rnn_words")
+            print("outputs_bw", outputs_bw.get_shape())
+            print("outputs_fw", outputs_fw.get_shape())
+            outputs = tf.concat(2, [outputs_fw, outputs_bw])
+            print("outputs", outputs.get_shape())
+
+            flattened = tf.reduce_max(outputs, axis=1)
+            print("flattened", flattened.get_shape())
+
+            fc_drop_1 = tf_layers.dropout(flattened, keep_prob=keep_prob, is_training=self.is_training)
+            fc = tf_layers.fully_connected(inputs=fc_drop_1, num_outputs=1024, activation_fn=tf.nn.relu)
+            fc_drop_2 = tf_layers.dropout(fc, keep_prob=keep_prob, is_training=self.is_training)
+
+            output_layer = tf_layers.fully_connected(fc_drop_2, num_outputs=self.LANGUAGES)
+            print("output_layer", output_layer.get_shape())
 
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
             self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
@@ -152,7 +166,7 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
+    parser.add_argument("--batch_size", default=500, type=int, help="Batch size.")
     parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
