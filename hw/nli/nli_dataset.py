@@ -105,6 +105,7 @@ class NLIDataset:
                     self._vocabularies[feature][id] = word
 
         self._permutation = np.random.permutation(len(self._sentence_lens))
+        self.max_sentence_len = np.max(self._sentence_lens)
 
     def vocabulary(self, feature):
         """Return vocabulary for required feature.

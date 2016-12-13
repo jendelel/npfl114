@@ -96,28 +96,24 @@ class Network:
             inputs = tf.pack([input_char_words, input_words], axis=3)
             print("inputs", inputs.get_shape())
 
-
-            seq_len = 250
+            seq_len = 25
             sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
 
             c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
             print("c3", c3.get_shape())
-            c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
+            c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4, char_embedding], stride=1)
             print("c4", c4.get_shape())
-            c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
+            c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5, char_embedding], stride=1)
             print("c5", c5.get_shape())
             c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
             print("c7", c7.get_shape())
 
             pooled = []
-            mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
-            print("pool", mp.get_shape())
             pooled.append(mp)
+            pooled.append(tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
-
-
             pooled_outputs = tf.concat(3, pooled)
             print("pooled_outputs", pooled_outputs.get_shape())
             flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
@@ -174,19 +170,18 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=200, type=int, help="Batch size.")
-    parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
-    parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
-    parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
-    parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
+    parser.add_argument("--data_train", default="nli-dataset/nli-train2.txt", type=str, help="Training data file.")
+    parser.add_argument("--data_dev", default="nli-dataset/nli-dev2.txt", type=str, help="Development data file.")
+    parser.add_argument("--data_test", default="nli-dataset/nli-test2.txt", type=str, help="Testing data file.")
+    parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
-    parser.add_argument("--rnn_cell_dim", default=100, type=int, help="RNN cell dimension.")
+    parser.add_argument("--rnn_cell_dim", default=128, type=int, help="RNN cell dimension.")
     parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
-    parser.add_argument("--word_embedding", default=100, type=int, help="word_embedding")
-    parser.add_argument("--char_embedding", default=100, type=int, help="char_embedding")
     parser.add_argument("--keep_prob", default=0.5, type=float, help="dropout probability")
-    parser.add_argument("--num_filters", default=512, type=int, help="number of output filters from convolution")
-
+    parser.add_argument("--num_filters", default=64, type=int, help="number of output filters from convolution")
+    parser.add_argument("--word_embedding", default=128, type=int, help="word_embedding")
+    parser.add_argument("--char_embedding", default=128, type=int, help="char_embedding")
     args = parser.parse_args()
 
     # Load the data
@@ -210,10 +205,17 @@ if __name__ == "__main__":
 
     for epoch in range(args.epochs):
         print("Training epoch {}".format(epoch + 1), file=sys.stderr)
+        batch = 0
         while not data_train.epoch_finished():
             sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                 data_train.next_batch(args.batch_size)
             network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages)
+            batch += 1
+            if batch % 10 == 0:
+                sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
+                    data_dev.whole_data_as_batch()
+                dev_accuracy = network.evaluate(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, "dev")
+                print("Development accuracy after epoch {} batch {} is {:.2f}.".format(epoch + 1, batch, 100. * dev_accuracy), file=sys.stderr)
 
         sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
             data_dev.whole_data_as_batch()

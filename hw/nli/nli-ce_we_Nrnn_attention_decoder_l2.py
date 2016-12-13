@@ -192,10 +192,10 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=100, type=int, help="Batch size.")
-    parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
-    parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
-    parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
+    parser.add_argument("--batch_size", default=500, type=int, help="Batch size.")
+    parser.add_argument("--data_train", default="nli-dataset/nli-train2.txt", type=str, help="Training data file.")
+    parser.add_argument("--data_dev", default="nli-dataset/nli-dev2.txt", type=str, help="Development data file.")
+    parser.add_argument("--data_test", default="nli-dataset/nli-test2.txt", type=str, help="Testing data file.")
     parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
