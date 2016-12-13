@@ -15,15 +15,13 @@ import tensorflow.contrib.metrics as tf_metrics
 
 import nli_dataset
 
-# TODO: Stabilizes at 42%+ accuracy, has limited power
-
 class Network:
     LANGUAGES = 11
 
     def _max_pool(self, inp, kernel_size, stride):
         with self.session.graph.as_default():
             mp_pre = tf.expand_dims(inp, axis=2)
-            mp = tf_layers.max_pool2d(inputs=mp_pre, kernel_size=[kernel_size, 1], stride=stride)
+            mp = tf_layers.max_pool2d(inputs=mp_pre, kernel_size=kernel_size, stride=stride)
             mp_post = tf.squeeze(mp, axis=2)
             print("mp", mp_post.get_shape())
             return mp_post
@@ -31,15 +29,16 @@ class Network:
     def _1d_conv(self, inp, num_outputs, kernel_size=3, stride=1, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm):
         with self.session.graph.as_default():
             conv_1 = tf_layers.convolution2d(inputs=inp, num_outputs=num_outputs, kernel_size=kernel_size, stride=stride,
-                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn)
+                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn, padding='VALID')
 
-            conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=num_outputs, kernel_size=kernel_size, stride=stride,
-                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn)
-            conv_2 = conv_2 + conv_1  # residual connection
-            print("Conv:", conv_2.get_shape())
-            return conv_2
+            #if stride == 1:
+            #    conv_2 += tf_layers.linear(inputs=inp, num_outputs=num_outputs)
+            #else:
+            #    conv_2 += tf_layers.convolution2d(inputs=inp, num_outputs=num_outputs, kernel_size=1, stride=stride, normalizer_fn=None, activation_fn=None)  # residual connections
+            #print("Conv:", conv_2.get_shape())
+            return conv_1
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.8):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -94,15 +93,41 @@ class Network:
                 input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
                                                      self.word_ids)
             print("input_words", input_words.get_shape())
-            input_concat = tf.concat(2, [input_char_words, input_words])
-            print("input_concat", input_concat.get_shape())
+            inputs = tf.pack([input_char_words, input_words], axis=3)
+            print("inputs", inputs.get_shape())
 
-            _, state = tf.nn.dynamic_rnn(rnn_cell_co, input_words, self.sentence_lens, dtype=tf.float32, scope="rnn_words")
-            print("state", state.get_shape())
-            output_layer = tf_layers.fully_connected(tf_layers.flatten(state), num_outputs=self.LANGUAGES)
 
+            seq_len = 250
+            sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
+
+
+            num_filters=256
+            c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
+            print("c3", c3.get_shape())
+            c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
+            print("c4", c4.get_shape())
+            c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
+            print("c5", c5.get_shape())
+
+            pooled = []
+            mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
+            print("pool", mp.get_shape())
+            pooled.append(mp)
+            pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
+            pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
+
+
+            pooled_outputs = tf.concat(3, pooled)
+            print("pooled_outputs", pooled_outputs.get_shape())
+            flatten = tf.reshape(pooled_outputs, [-1, 3 * num_filters])
+            print("flatten", flatten.get_shape())
+            dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+
+            # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
+            #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
+            output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
             loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
-            self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
+            self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
             self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
             self.accuracy = tf_metrics.accuracy(self.predictions, self.languages)
 
@@ -147,7 +172,7 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
+    parser.add_argument("--batch_size", default=500, type=int, help="Batch size.")
     parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")

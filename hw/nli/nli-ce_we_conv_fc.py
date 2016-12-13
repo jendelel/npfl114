@@ -97,7 +97,7 @@ class Network:
             input_concat = tf.concat(2, [input_char_words, input_words])
             print("input_concat", input_concat.get_shape())
 
-            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_words,
+            (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, input_concat,
                                                                           self.sentence_lens, dtype=tf.float32, scope="rnn_words")
             print("outputs_bw", outputs_bw.get_shape())
             print("outputs_fw", outputs_fw.get_shape())
