@@ -65,6 +65,9 @@ class Network:
             self.charseq_lens = tf.placeholder(tf.int32, [None])
             self.languages = tf.placeholder(tf.int32, [None])
             self.is_training = tf.placeholder_with_default(False, [])
+            self.keep_prob = tf.placeholder_with_default(1.0, [])
+
+            rnn_cell_co = tf.nn.rnn_cell.DropoutWrapper(rnn_cell_co, self.keep_prob, self.keep_prob)
 
             if char_embedding == -1:
                 input_chars = tf.one_hot(self.charseqs, num_chars)
@@ -93,40 +96,26 @@ class Network:
                 input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
                                                      self.word_ids)
             print("input_words", input_words.get_shape())
-            inputs = tf.pack([input_char_words, input_words], axis=3)
+            inputs = tf.concat(2, [input_char_words, input_words])
             print("inputs", inputs.get_shape())
 
-
-            seq_len = 250
-            sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
-
-            c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
-            print("c3", c3.get_shape())
-            c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
-            print("c4", c4.get_shape())
-            c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
-            print("c5", c5.get_shape())
-            c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
-            print("c7", c7.get_shape())
-
-            pooled = []
-            mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
-            print("pool", mp.get_shape())
-            pooled.append(mp)
-            pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
-            pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
-            pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
+            (context_fw, context_bw), (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell_co, rnn_cell_co, inputs, self.sentence_lens, dtype=tf.float32)
+            print("state_fw", state_fw.get_shape())
 
 
-            pooled_outputs = tf.concat(3, pooled)
-            print("pooled_outputs", pooled_outputs.get_shape())
-            flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
-            print("flatten", flatten.get_shape())
-            dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+            x = tf.concat(2, [context_fw, inputs, context_bw])
+            print("x", x.get_shape())
+            y = tf_layers.linear(x, num_outputs=num_filters, activation_fn=tf.tanh)
+            print("y", x.get_shape())
 
-            # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
-            #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
-            output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
+            mp = tf.reduce_max(y, axis=1)
+            print("mp", mp.get_shape())
+
+            d1 = tf_layers.dropout(mp, keep_prob=self.keep_prob)
+            hidden = tf_layers.linear(inputs=d1, num_outputs=300)
+            d2 = tf_layers.dropout(hidden, keep_prob=self.keep_prob)
+            output_layer = tf_layers.linear(inputs=d2, num_outputs=self.LANGUAGES)
+
             self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
             self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
             self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
@@ -143,12 +132,12 @@ class Network:
     def training_step(self):
         return self.session.run(self.global_step)
 
-    def train(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages):
+    def train(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, keep_prob):
         _, summary = \
             self.session.run([self.training, self.summary],
                              {self.sentence_lens: sentence_lens, self.word_ids: word_ids,
                               self.charseq_ids: charseq_ids, self.charseqs: charseqs, self.charseq_lens: charseq_lens,
-                              self.languages: languages, self.dataset_name: "train", self.is_training: True})
+                              self.languages: languages, self.dataset_name: "train", self.is_training: True, self.keep_prob:keep_prob})
         self.summary_writer.add_summary(summary, self.training_step)
 
     def evaluate(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, dataset):
@@ -173,7 +162,7 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=200, type=int, help="Batch size.")
+    parser.add_argument("--batch_size", default=500, type=int, help="Batch size.")
     parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
@@ -213,7 +202,7 @@ if __name__ == "__main__":
         while not data_train.epoch_finished():
             sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                 data_train.next_batch(args.batch_size)
-            network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages)
+            network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, args.keep_prob)
 
         sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
             data_dev.whole_data_as_batch()

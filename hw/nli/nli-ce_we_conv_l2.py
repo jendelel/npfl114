@@ -20,22 +20,25 @@ class Network:
 
     def _max_pool(self, inp, kernel_size, stride):
         with self.session.graph.as_default():
-            mp = tf_layers.max_pool2d(inputs=inp, kernel_size=kernel_size, stride=stride)
-            print("mp", mp.get_shape())
-            return mp
+            mp_pre = tf.expand_dims(inp, axis=2)
+            mp = tf_layers.max_pool2d(inputs=mp_pre, kernel_size=kernel_size, stride=stride)
+            mp_post = tf.squeeze(mp, axis=2)
+            print("mp", mp_post.get_shape())
+            return mp_post
 
     def _1d_conv(self, inp, num_outputs, kernel_size=3, stride=1, activation_fn=tf.nn.relu, normalizer_fn=tf_layers.batch_norm):
         with self.session.graph.as_default():
             conv_1 = tf_layers.convolution2d(inputs=inp, num_outputs=num_outputs, kernel_size=kernel_size, stride=stride,
-                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn)
+                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn, padding='VALID')
 
-            conv_2 = tf_layers.convolution2d(inputs=conv_1, num_outputs=num_outputs, kernel_size=kernel_size, stride=stride,
-                                             activation_fn=activation_fn, normalizer_fn=normalizer_fn)
-            conv_2 = conv_2 + conv_1  # residual connection
-            print("Conv:", conv_2.get_shape())
-            return conv_2
+            #if stride == 1:
+            #    conv_2 += tf_layers.linear(inputs=inp, num_outputs=num_outputs)
+            #else:
+            #    conv_2 += tf_layers.convolution2d(inputs=inp, num_outputs=num_outputs, kernel_size=1, stride=stride, normalizer_fn=None, activation_fn=None)  # residual connections
+            #print("Conv:", conv_2.get_shape())
+            return conv_1
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, rnn_num=0, l2=0.001):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, num_filters=512, l2=0.001):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -47,15 +50,11 @@ class Network:
 
         # Construct the graph
         with self.session.graph.as_default():
-            with tf.variable_scope("all", regularizer=tf_layers.l2_regularizer(l2)):
+            with tf.variable_scope("l2", regularizer=tf_layers.l2_regularizer(l2)):
                 if rnn_cell == "LSTM":
                     rnn_cell_co = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
-                    rnn_cell_co2 = tf.nn.rnn_cell.LSTMCell(word_embedding+char_embedding)
                 elif rnn_cell == "GRU":
                     rnn_cell_co = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
-                    rnn_cell_co2 = tf.nn.rnn_cell.GRUCell(word_embedding+char_embedding)
-                elif rnn_cell == "GRUGRID":
-                    rnn_cell_co = tf.contrib.rnn.Grid2GRUCell
                 else:
                     raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
 
@@ -67,9 +66,7 @@ class Network:
                 self.charseq_lens = tf.placeholder(tf.int32, [None])
                 self.languages = tf.placeholder(tf.int32, [None])
                 self.is_training = tf.placeholder_with_default(False, [])
-                self.tags = tf.placeholder(tf.int32, [None, None])
 
-                # charseqs je matice [batch x id charakteru]
                 if char_embedding == -1:
                     input_chars = tf.one_hot(self.charseqs, num_chars)
                 else:
@@ -97,37 +94,42 @@ class Network:
                     input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
                                                          self.word_ids)
                 print("input_words", input_words.get_shape())
-                input_tags = tf.nn.embedding_lookup(tf.get_variable("tag_emb", shape=[num_words, word_embedding]),
-                                                    self.tags)
-                input_concat = tf.concat(2, [input_char_words, input_words, input_tags])
+                inputs = tf.pack([input_char_words, input_words], axis=3)
+                print("inputs", inputs.get_shape())
+
+
                 seq_len = 250
-                input_concat = tf.slice(input_concat, [0, 0, 0], [-1, seq_len, char_embedding+word_embedding+word_embedding])
-                input_concat = tf.expand_dims(input_concat, -1)
-                print("input_concat", input_concat.get_shape())
+                sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
 
-                num_filters = 128
-                filters = [3, 4, 5]
+                c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
+                print("c3", c3.get_shape())
+                c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
+                print("c4", c4.get_shape())
+                c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
+                print("c5", c5.get_shape())
+                c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
+                print("c7", c7.get_shape())
+
                 pooled = []
-                for i, filter_size in enumerate(filters):
-                    conv = tf_layers.convolution2d(input_concat, num_outputs=num_filters, kernel_size=filter_size, stride=1, activation_fn=tf.nn.relu,
-                            normalizer_fn=tf_layers.batch_norm)
-                    mp = self._max_pool(conv, kernel_size=seq_len, stride=1)
-                    pooled.append(mp)
+                mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
+                print("pool", mp.get_shape())
+                pooled.append(mp)
+                pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
+                pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
+                pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
 
-                num_filters_total = num_filters * len(filters)
-                pool = tf.concat(3, pooled)
-                print("pool", pool.get_shape())
-                pool_r = tf.squeeze(pool, axis=1)
-                print("pool_r", pool_r.get_shape())
-                dim2 = int(pool_r.get_shape()[1])
-                pool_flat = tf.reshape(pool_r, [-1, dim2*num_filters_total])
-                print("pool_flat", pool_flat.get_shape())
-                drop = tf_layers.dropout(pool_flat, keep_prob=keep_prob, is_training=self.is_training)
-                output_layer = tf_layers.fully_connected(drop, num_outputs=self.LANGUAGES)
-                print("output_layer", output_layer.get_shape())
 
-                loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
-                self.training = tf.train.AdamOptimizer().minimize(loss, self.global_step)
+                pooled_outputs = tf.concat(3, pooled)
+                print("pooled_outputs", pooled_outputs.get_shape())
+                flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
+                print("flatten", flatten.get_shape())
+                dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+
+                # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
+                #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
+                output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
+                self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
+                self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
                 self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
                 self.accuracy = tf_metrics.accuracy(self.predictions, self.languages)
 
@@ -142,28 +144,27 @@ class Network:
     def training_step(self):
         return self.session.run(self.global_step)
 
-    def train(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, tags):
+    def train(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages):
         _, summary = \
             self.session.run([self.training, self.summary],
                              {self.sentence_lens: sentence_lens, self.word_ids: word_ids,
                               self.charseq_ids: charseq_ids, self.charseqs: charseqs, self.charseq_lens: charseq_lens,
-                              self.languages: languages, self.dataset_name: "train", self.is_training: True, self.tags: tags})
+                              self.languages: languages, self.dataset_name: "train", self.is_training: True})
         self.summary_writer.add_summary(summary, self.training_step)
 
-    def evaluate(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, tags, dataset):
-        accuracy, summary = \
-            self.session.run([self.accuracy, self.summary],
+    def evaluate(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, dataset):
+        accuracy, loss, summary = \
+            self.session.run([self.accuracy, self.loss, self.summary],
                              {self.sentence_lens: sentence_lens, self.word_ids: word_ids,
                               self.charseq_ids: charseq_ids, self.charseqs: charseqs, self.charseq_lens: charseq_lens,
-                              self.languages: languages, self.dataset_name: dataset, self.tags: tags})
+                              self.languages: languages, self.dataset_name: dataset})
         self.summary_writer.add_summary(summary, self.training_step)
-        return accuracy
+        return (accuracy, loss)
 
-    def predict(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags):
+    def predict(self, sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens):
         return self.session.run(self.predictions,
                                 {self.sentence_lens: sentence_lens, self.word_ids: word_ids,
-                                 self.charseq_ids: charseq_ids, self.charseqs: charseqs, self.charseq_lens: charseq_lens,
-                                 self.tags: tags})
+                                 self.charseq_ids: charseq_ids, self.charseqs: charseqs, self.charseq_lens: charseq_lens})
 
 
 if __name__ == "__main__":
@@ -173,7 +174,7 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=25, type=int, help="Batch size.")
+    parser.add_argument("--batch_size", default=200, type=int, help="Batch size.")
     parser.add_argument("--data_train", default="nli-dataset/nli-train.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test.txt", type=str, help="Testing data file.")
@@ -184,8 +185,8 @@ if __name__ == "__main__":
     parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--word_embedding", default=100, type=int, help="word_embedding")
     parser.add_argument("--char_embedding", default=100, type=int, help="char_embedding")
-    parser.add_argument("--rnn_num", default=0, type=int, help="number of rnns")
-    parser.add_argument("--keep_prob", default=0.5, type=float, help="dropout keep prob")
+    parser.add_argument("--keep_prob", default=0.5, type=float, help="dropout probability")
+    parser.add_argument("--num_filters", default=512, type=int, help="number of output filters from convolution")
     parser.add_argument("--l2", default=0.001, type=float, help="l2 lambda")
 
     args = parser.parse_args()
@@ -198,11 +199,13 @@ if __name__ == "__main__":
 
     # Construct the network
     print("Constructing the network.", file=sys.stderr)
-    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}-rnn{}-drop{}-l2{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding, args.rnn_num, args.keep_prob, args.l2)
+    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}-nf{}-l2:{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding, args.num_filters, args.l2)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
-                      logdir=args.logdir, expname=expname, threads=args.threads, keep_prob=args.keep_prob,
-                      word_embedding=args.word_embedding, char_embedding=args.char_embedding, rnn_num=args.rnn_num, l2=args.l2)
+                      logdir=args.logdir, expname=expname, threads=args.threads,
+                      word_embedding=args.word_embedding, char_embedding=args.char_embedding,
+                      keep_prob=args.keep_prob, num_filters=args.num_filters, 
+                      l2=args.l2)
 
     # Train
     best_dev_accuracy = 0
@@ -213,18 +216,18 @@ if __name__ == "__main__":
         while not data_train.epoch_finished():
             sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                 data_train.next_batch(args.batch_size)
-            network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, tags)
+            network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages)
 
         sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
             data_dev.whole_data_as_batch()
-        dev_accuracy = network.evaluate(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, tags, "dev")
-        print("Development accuracy after epoch {} is {:.2f}.".format(epoch + 1, 100. * dev_accuracy), file=sys.stderr)
+        dev_accuracy, dev_loss = network.evaluate(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, "dev")
+        print("Development accuracy after epoch {} is {:.2f}. Dev loss is {:.2f}".format(epoch + 1, 100. * dev_accuracy, dev_loss), file=sys.stderr)
 
         if dev_accuracy > best_dev_accuracy:
             best_dev_accuracy = dev_accuracy
             sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                 data_test.whole_data_as_batch()
-            test_predictions = network.predict(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags)
+            test_predictions = network.predict(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens)
 
     # Print test predictions
     for prediction in test_predictions:
