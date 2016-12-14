@@ -109,7 +109,6 @@ class Network:
             print("c7", c7.get_shape())
 
             pooled = []
-            pooled.append(mp)
             pooled.append(tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
@@ -173,13 +172,13 @@ if __name__ == "__main__":
     parser.add_argument("--data_train", default="nli-dataset/nli-train2.txt", type=str, help="Training data file.")
     parser.add_argument("--data_dev", default="nli-dataset/nli-dev2.txt", type=str, help="Development data file.")
     parser.add_argument("--data_test", default="nli-dataset/nli-test2.txt", type=str, help="Testing data file.")
-    parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
+    parser.add_argument("--epochs", default=3, type=int, help="Number of epochs.")
     parser.add_argument("--logdir", default="logs", type=str, help="Logdir name.")
     parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
     parser.add_argument("--rnn_cell_dim", default=128, type=int, help="RNN cell dimension.")
     parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--keep_prob", default=0.5, type=float, help="dropout probability")
-    parser.add_argument("--num_filters", default=64, type=int, help="number of output filters from convolution")
+    parser.add_argument("--num_filters", default=1024, type=int, help="number of output filters from convolution")
     parser.add_argument("--word_embedding", default=128, type=int, help="word_embedding")
     parser.add_argument("--char_embedding", default=128, type=int, help="char_embedding")
     args = parser.parse_args()
@@ -202,6 +201,7 @@ if __name__ == "__main__":
     # Train
     best_dev_accuracy = 0
     test_predictions = None
+    dev_predictions = None
 
     for epoch in range(args.epochs):
         print("Training epoch {}".format(epoch + 1), file=sys.stderr)
@@ -211,11 +211,11 @@ if __name__ == "__main__":
                 data_train.next_batch(args.batch_size)
             network.train(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages)
             batch += 1
-            if batch % 10 == 0:
+            if batch % 100 == 0:
                 sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                     data_dev.whole_data_as_batch()
-                dev_accuracy = network.evaluate(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, "dev")
-                print("Development accuracy after epoch {} batch {} is {:.2f}.".format(epoch + 1, batch, 100. * dev_accuracy), file=sys.stderr)
+                dev_accuracy, dev_loss = network.evaluate(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, languages, "dev")
+                print("Development accuracy after epoch {} batch {} is {:.2f}, loss {:.2f}.".format(epoch + 1, batch, 100. * dev_accuracy, dev_loss), file=sys.stderr)
 
         sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
             data_dev.whole_data_as_batch()
@@ -227,7 +227,16 @@ if __name__ == "__main__":
             sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
                 data_test.whole_data_as_batch()
             test_predictions = network.predict(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens)
+            sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, tags, levels, prompts, languages = \
+                data_dev.whole_data_as_batch()
+            dev_predictions = network.predict(sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens)
 
-    # Print test predictions
-    for prediction in test_predictions:
-        print(data_test.vocabulary('languages')[prediction])
+    with open("dev_results.txt", "w") as f:
+        # Print dev predictions
+        for prediction in dev_predictions:
+            f.write(data_dev.vocabulary('languages')[prediction] + "\r\n")
+
+    with open("test_results.txt", "w") as f:
+        # Print test predictions
+        for prediction in test_predictions:
+            f.write(data_test.vocabulary('languages')[prediction] + "\r\n")
