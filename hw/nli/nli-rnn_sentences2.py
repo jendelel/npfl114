@@ -38,7 +38,7 @@ class Network:
             #print("Conv:", conv_2.get_shape())
             return conv_1
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, num_filters=512, l2=0.001):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, num_filters=512, l2=0.001, pretrained=None):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -83,8 +83,8 @@ class Network:
             input_char_words = tf.nn.embedding_lookup(input_chars, self.charseq_ids)
             print("input_char_words", input_char_words.get_shape())
 
-            #word_emb = tf.get_variable("word_emb", shape=[num_words, 300], initializer=tf.constant_initializer(np.array(word_embeddings_matrix))
-            word_emb = tf.get_variable("word_emb", shape=[num_words, 300])
+            word_emb = tf.get_variable("word_emb", shape=[num_words, 300], initializer=tf.constant_initializer(pretrained))
+            #word_emb = tf.get_variable("word_emb", shape=[num_words, 300])
             input_words = tf.nn.embedding_lookup(word_emb, self.word_ids)
             print("input_words, t", input_words.get_shape())
             inputs = tf.concat(2, [input_char_words, input_words])
@@ -176,13 +176,18 @@ if __name__ == "__main__":
 
     # Load word embeddings
     print("Loading pre trained embeddings.", file=sys.stderr)
-
+    import pandas
+    import csv
+    with open("nli-dataset/glove.6B.300d.txt", "r") as f:
+        w_emb = pandas.read_csv(f, quoting=csv.QUOTE_NONE, delimiter=" ").as_matrix()
 
     # Load the data
     print("Loading the data.", file=sys.stderr)
-    data_train = nli_dataset.NLIDataset(args.data_train)
+    data_train = nli_dataset.NLIDataset(args.data_train, pretrained=w_emb)
     data_dev = nli_dataset.NLIDataset(args.data_dev, train=data_train)
     data_test = nli_dataset.NLIDataset(args.data_test, train=data_train, no_languages=True)
+
+    w_emb[:, 0] = np.vectorize(lambda x: data_train.vocabulary_map("words")[x])(w_emb[:, 0])
 
     # Construct the network
     print("Constructing the network.", file=sys.stderr)
@@ -191,8 +196,8 @@ if __name__ == "__main__":
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
                       logdir=args.logdir, expname=expname, threads=args.threads,
                       word_embedding=args.word_embedding, char_embedding=args.char_embedding,
-                      keep_prob=args.keep_prob, num_filters=args.num_filters, 
-                      l2=args.l2)
+                      keep_prob=args.keep_prob, num_filters=args.num_filters,
+                      l2=args.l2, pretrained=w_emb)
 
     # Train
     best_dev_accuracy = 0

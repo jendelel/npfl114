@@ -7,7 +7,7 @@ import numpy as np
 class NLIDataset:
     """Class capable of loading NLI dataset."""
 
-    def __init__(self, filename, add_bow_eow=False, train=None, no_languages=False):
+    def __init__(self, filename, add_bow_eow=False, train=None, no_languages=False, pretrained=None):
         """Load dataset from a given file.
 
         Arguments:
@@ -37,6 +37,12 @@ class NLIDataset:
         self._prompts = []
 
         # Load the sentences
+        if (pretrained is not None) and (not train):
+            for line in pretrained:
+                word = line[0]
+                if word not in self._vocabulary_maps['words']:
+                    self._vocabulary_maps['words'][word] = len(self._vocabulary_maps['words'])
+
         with open(filename, "r") as file:
             for line in file:
                 line = line.rstrip("\r\n")
@@ -142,6 +148,20 @@ class NLIDataset:
         prompts
         """
         return self._vocabularies[feature]
+    
+    def vocabulary_map(self, feature):
+        """Return vocabulary map for required feature.
+
+        The features are the following:
+        sentences
+        words
+        chars
+        tags
+        languages
+        levels
+        prompts
+        """
+        return self._vocabulary_maps[feature]
 
     def next_batch(self, batch_size):
         """Return the next batch.
