@@ -50,9 +50,6 @@ class Network:
 
         # Construct the graph
         with self.session.graph.as_default():
-            c_slice = 35
-            rnn_cell = tf.nn.rnn_cell.GRUCell(c_slice)
-
             self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
             self.essay_lens = tf.placeholder(tf.int32, [None])
             self.sentence_ids = tf.placeholder(tf.int32, [None, None])
@@ -67,7 +64,6 @@ class Network:
             input_chars = self.charseqs
             input_chars = tf.nn.embedding_lookup(tf.get_variable("char_emb", shape=[num_chars, char_embedding]), input_chars)
             input_chars = tf.expand_dims(input_chars, axis=3)
-            input_chars = tf.slice(input_chars, [0, 0, 0, 0], [-1, c_slice, char_embedding, 1])
             print("input_chars", input_chars.get_shape())
 
             num_filters_c = int(char_embedding/4)
@@ -81,14 +77,14 @@ class Network:
             print("cc7", cc7.get_shape())
 
             pooled = []
-            cp = tf_layers.max_pool2d(inputs=cc3, kernel_size=[c_slice - 3 + 1, 1], stride=1)
+            cp = tf.reduce_max(cc3, axis=1)
             print("c_pool", cp.get_shape())
             pooled.append(cp)
-            pooled.append(tf_layers.max_pool2d(inputs=cc4, kernel_size=[c_slice - 4 + 1, 1], stride=1))
-            pooled.append(tf_layers.max_pool2d(inputs=cc5, kernel_size=[c_slice - 5 + 1, 1], stride=1))
-            pooled.append(tf_layers.max_pool2d(inputs=cc7, kernel_size=[c_slice - 7 + 1, 1], stride=1))
+            pooled.append(tf.reduce_max(cc4, axis=1))
+            pooled.append(tf.reduce_max(cc5, axis=1))
+            pooled.append(tf.reduce_max(cc7, axis=1))
 
-            c_pooled_outputs = tf.squeeze(tf.squeeze(tf.concat(3, pooled), axis=1), axis=1)
+            c_pooled_outputs = tf.squeeze(tf.concat(2, pooled), axis=1)
             print("c_pooled_outputs", c_pooled_outputs.get_shape())
 
             w_slice = 20
