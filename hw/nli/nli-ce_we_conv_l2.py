@@ -50,95 +50,97 @@ class Network:
 
         # Construct the graph
         with self.session.graph.as_default():
-            with tf.variable_scope("l2", regularizer=tf_layers.l2_regularizer(l2)):
-                if rnn_cell == "LSTM":
-                    rnn_cell_co = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
-                elif rnn_cell == "GRU":
-                    rnn_cell_co = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
-                else:
-                    raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
+            if rnn_cell == "LSTM":
+                rnn_cell_co = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
+            elif rnn_cell == "GRU":
+                rnn_cell_co = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
+            else:
+                raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
 
-                self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
-                self.sentence_lens = tf.placeholder(tf.int32, [None])
-                self.word_ids = tf.placeholder(tf.int32, [None, None])
-                self.charseq_ids = tf.placeholder(tf.int32, [None, None])
-                self.charseqs = tf.placeholder(tf.int32, [None, None])
-                self.charseq_lens = tf.placeholder(tf.int32, [None])
-                self.languages = tf.placeholder(tf.int32, [None])
-                self.is_training = tf.placeholder_with_default(False, [])
+            self.global_step = tf.Variable(0, dtype=tf.int64, trainable=False, name="global_step")
+            self.sentence_lens = tf.placeholder(tf.int32, [None])
+            self.word_ids = tf.placeholder(tf.int32, [None, None])
+            self.charseq_ids = tf.placeholder(tf.int32, [None, None])
+            self.charseqs = tf.placeholder(tf.int32, [None, None])
+            self.charseq_lens = tf.placeholder(tf.int32, [None])
+            self.languages = tf.placeholder(tf.int32, [None])
+            self.is_training = tf.placeholder_with_default(False, [])
 
-                if char_embedding == -1:
-                    input_chars = tf.one_hot(self.charseqs, num_chars)
-                else:
-                    input_chars = tf.nn.embedding_lookup(tf.get_variable("char_emb", shape=[num_chars, char_embedding]),
-                                                         self.charseqs)
-                print("input_chars", input_chars.get_shape())
+            if char_embedding == -1:
+                input_chars = tf.one_hot(self.charseqs, num_chars)
+            else:
+                input_chars = tf.nn.embedding_lookup(tf.get_variable("char_emb", shape=[num_chars, char_embedding]),
+                                                     self.charseqs)
+            print("input_chars", input_chars.get_shape())
 
-                if rnn_cell == "LSTM":
-                    rnn_cell_ce = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
-                elif rnn_cell == "GRU":
-                    rnn_cell_ce = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
-                else:
-                    raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
-                _, (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell_ce, rnn_cell_ce, input_chars,
-                                                                              self.charseq_lens, dtype=tf.float32, scope="rnn_chars")
-                input_chars = state_fw + state_bw
-                print("input_chars", input_chars.get_shape())
+            if rnn_cell == "LSTM":
+                rnn_cell_ce = tf.nn.rnn_cell.LSTMCell(rnn_cell_dim)
+            elif rnn_cell == "GRU":
+                rnn_cell_ce = tf.nn.rnn_cell.GRUCell(rnn_cell_dim)
+            else:
+                raise ValueError("Unknown rnn_cell {}".format(rnn_cell))
+            _, (state_fw, state_bw) = tf.nn.bidirectional_dynamic_rnn(rnn_cell_ce, rnn_cell_ce, input_chars,
+                                                                          self.charseq_lens, dtype=tf.float32, scope="rnn_chars")
+            input_chars = state_fw + state_bw
+            print("input_chars", input_chars.get_shape())
 
-                input_char_words = tf.nn.embedding_lookup(input_chars, self.charseq_ids)
-                print("input_char_words", input_char_words.get_shape())
+            input_char_words = tf.nn.embedding_lookup(input_chars, self.charseq_ids)
+            print("input_char_words", input_char_words.get_shape())
 
-                if word_embedding == -1:
-                    input_words = tf.one_hot(self.word_ids, num_words)
-                else:
-                    input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
-                                                         self.word_ids)
-                print("input_words", input_words.get_shape())
-                inputs = tf.pack([input_char_words, input_words], axis=3)
-                print("inputs", inputs.get_shape())
-
-
-                seq_len = 250
-                sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
-
-                c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
-                print("c3", c3.get_shape())
-                c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
-                print("c4", c4.get_shape())
-                c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
-                print("c5", c5.get_shape())
-                c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
-                print("c7", c7.get_shape())
-
-                pooled = []
-                mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
-                print("pool", mp.get_shape())
-                pooled.append(mp)
-                pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
-                pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
-                pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
+            if word_embedding == -1:
+                input_words = tf.one_hot(self.word_ids, num_words)
+            else:
+                input_words = tf.nn.embedding_lookup(tf.get_variable("word_emb", shape=[num_words, word_embedding]),
+                                                     self.word_ids)
+            print("input_words", input_words.get_shape())
+            inputs = tf.pack([input_char_words, input_words], axis=3)
+            print("inputs", inputs.get_shape())
 
 
-                pooled_outputs = tf.concat(3, pooled)
-                print("pooled_outputs", pooled_outputs.get_shape())
-                flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
-                print("flatten", flatten.get_shape())
-                dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+            seq_len = 250
+            sliced = tf.slice(inputs, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
 
-                # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
-                #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
-                output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
-                self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
-                self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
-                self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
-                self.accuracy = tf_metrics.accuracy(self.predictions, self.languages)
+            c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
+            print("c3", c3.get_shape())
+            c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
+            print("c4", c4.get_shape())
+            c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
+            print("c5", c5.get_shape())
+            c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
+            print("c7", c7.get_shape())
 
-                self.dataset_name = tf.placeholder(tf.string, [])
-                self.summary = tf.merge_summary([tf.scalar_summary(self.dataset_name+"/loss", loss),
-                                                 tf.scalar_summary(self.dataset_name+"/accuracy", self.accuracy)])
+            pooled = []
+            mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
+            print("pool", mp.get_shape())
+            pooled.append(mp)
+            pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
+            pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
+            pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
 
-                # Initialize variables
-                self.session.run(tf.initialize_all_variables())
+            pooled_outputs = tf.concat(3, pooled)
+            print("pooled_outputs", pooled_outputs.get_shape())
+            flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
+            print("flatten", flatten.get_shape())
+            dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+
+            # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
+            #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
+            output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
+
+            train_vars = tf.trainable_variables()
+            lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in train_vars])*l2
+            self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages) + lossL2
+
+            self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
+            self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
+            self.accuracy = tf_metrics.accuracy(self.predictions, self.languages)
+
+            self.dataset_name = tf.placeholder(tf.string, [])
+            self.summary = tf.merge_summary([tf.scalar_summary(self.dataset_name+"/loss", loss),
+                                             tf.scalar_summary(self.dataset_name+"/accuracy", self.accuracy)])
+
+            # Initialize variables
+            self.session.run(tf.initialize_all_variables())
 
     @property
     def training_step(self):
