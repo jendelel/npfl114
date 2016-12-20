@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
 
     parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
-    parser.add_argument("--epsilon_final", default=0.001, type=float, help="Epsilon decay rate.")
+    parser.add_argument("--epsilon_final", default=0.01, type=float, help="Epsilon decay rate.")
     parser.add_argument("--gamma", default=0.99999, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
