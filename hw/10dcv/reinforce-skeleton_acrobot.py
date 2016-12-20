@@ -6,6 +6,7 @@ import environment_continuous
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as tf_layers
+import tensorflow.contrib.losses as tf_losses
 
 class PolicyGradient:
     def __init__(self, observations, policy_network, learning_rate, threads=1, seed=42):
@@ -18,16 +19,15 @@ class PolicyGradient:
         # Construct the graph
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
-            # TODO: define the following, using policy_network
-            # logits = ...
-            # self.probabilities = ... [probabilities of all actions]
+
+            logits = policy_network(self.observations)
+            self.probabilities = tf_layers.softmax(logits)
 
             self.chosen_actions = tf.placeholder(tf.int32, [None])
             self.rewards = tf.placeholder(tf.float32, [None])
 
-            # TODO: compute loss, as cross_entropy between logits and chosen_actions, multiplying it by self.rewards
-            # loss = ...
-            # self.training = ... [use learning_rate]
+            loss = tf.mul(tf_losses.sparse_softmax_cross_entropy(logits, self.chosen_actions), self.rewards)
+            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss)
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -49,14 +49,14 @@ if __name__ == "__main__":
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", default="CartPole-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=1000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--env", default="Acrobot-v1", type=str, help="Name of the environment.")
+    parser.add_argument("--episodes", default=5000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
     parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
-    parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
+    parser.add_argument("--gamma", default=0.99, type=float, help="Discounting factor.")
     parser.add_argument("--batch_size", default=5, type=int, help="Number of episodes to train on.")
     parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
     args = parser.parse_args()
@@ -87,9 +87,8 @@ if __name__ == "__main__":
                 if args.render_each and episode > 0 and episode % args.render_each == 0:
                     env.render()
 
-                # TODO: predict action, using pg.predict and choosing action according to the probabilities
-                # probabilities = ...
-                # action = ...
+                [probabilities] = pg.predict(observations=[observation])
+                action = np.random.choice(np.arange(len(probabilities)), p=probabilities)
 
                 observations.append(observation)
                 actions.append(action)
@@ -103,7 +102,12 @@ if __name__ == "__main__":
                 if done:
                     break
 
-            # TODO: sum and discount rewards, only the last t of them
+            begin_index = len(rewards)-t-1
+            for i in range(begin_index, len(rewards)):
+                g_i = 0
+                for j in range(len(rewards)-i):
+                    g_i += rewards[i + j] * (args.gamma ** (j - 1))
+                rewards[i] = g_i
 
             episode_rewards.append(total_reward)
             episode_lengths.append(t)
