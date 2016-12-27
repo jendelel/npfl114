@@ -55,10 +55,10 @@ if __name__ == "__main__":
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
-    parser.add_argument("--gamma", default=0.999, type=float, help="Discounting factor.")
-    parser.add_argument("--batch_size", default=5, type=int, help="Number of episodes to train on.")
-    parser.add_argument("--hidden_layer", default=300, type=int, help="Size of hidden layer.")
+    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
+    parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
+    parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
+    parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
     args = parser.parse_args()
 
     # Create the environment
@@ -103,7 +103,7 @@ if __name__ == "__main__":
                     break
 
             begin_index = len(rewards)-t-1
-            for i in range(batch_start, len(rewards)):
+            for i in range(begin_index, len(rewards)):
                 g_i = 0
                 for j in range(len(rewards)-i):
                     g_i += rewards[i + j] * (args.gamma ** (j - 1))
