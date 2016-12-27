@@ -101,7 +101,8 @@ class Network:
                 inputs = tf.concat(2, [input_char_words, input_words])
                 print("inputs", inputs.get_shape())
 
-                ctx_dim = embedding_dim = word_embedding + char_embedding
+                embedding_dim = word_embedding + char_embedding
+                ctx_dim = word_embedding
                 rcnn_l = rcnn_cell.RCNNCell(ctx_dim, embedding_dim, tf.nn.relu, "left_rcnn")
                 rcnn_r = rcnn_cell.RCNNCell(ctx_dim, embedding_dim, tf.nn.relu, "right_rcnn")
 
@@ -111,15 +112,40 @@ class Network:
                 print("inputs", inputs.get_shape())
 
 
-                x = tf.concat(2, [context_fw, inputs, context_bw])
+                x = tf.pack([context_fw, input_words, input_char_words, context_bw], axis=3)
                 print("x", x.get_shape())
-                y = tf_layers.linear(x, num_outputs=num_filters, activation_fn=tf.tanh)
-                print("y", x.get_shape())
+                #y = tf_layers.linear(x, num_outputs=num_filters, activation_fn=tf.tanh)
+                #print("y", x.get_shape())
 
-                mp = tf.reduce_max(y, axis=1)
-                print("mp", mp.get_shape())
+                #mp = tf.reduce_max(y, axis=1)
+                #print("mp", mp.get_shape())
+                seq_len=250
+                sliced = tf.slice(x, [0, 0, 0, 0], [-1, seq_len, char_embedding, 2])
 
-                output_layer = tf_layers.linear(inputs=mp, num_outputs=self.LANGUAGES)
+                c3 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[3, char_embedding], stride=1)
+                print("c3", c3.get_shape())
+                c4 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[4,char_embedding], stride=1)
+                print("c4", c4.get_shape())
+                c5 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[5,char_embedding], stride=1)
+                print("c5", c5.get_shape())
+                c7 = self._1d_conv(sliced, num_outputs=num_filters, kernel_size=[7,char_embedding], stride=1)
+                print("c7", c7.get_shape())
+
+                pooled = []
+                mp = tf_layers.max_pool2d(inputs=c3, kernel_size=[seq_len - 3 + 1, 1], stride=1)
+                print("pool", mp.get_shape())
+                pooled.append(mp)
+                pooled.append(tf_layers.max_pool2d(inputs=c4, kernel_size=[seq_len - 4 + 1, 1], stride=1))
+                pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
+                pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
+
+                pooled_outputs = tf.concat(3, pooled)
+                print("pooled_outputs", pooled_outputs.get_shape())
+                flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
+                print("flatten", flatten.get_shape())
+                dropout = tf_layers.dropout(flatten, keep_prob=keep_prob, is_training=self.is_training)
+
+                output_layer = tf_layers.linear(inputs=dropout, num_outputs=self.LANGUAGES)
 
                 self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
                 self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
