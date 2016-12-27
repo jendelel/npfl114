@@ -19,19 +19,18 @@ class PolicyGradientWithBaseline:
         # Construct the graph
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
-            # TODO: define the following, using policy_and_value_network
-            # logits = ...
-            # self.value = ...
-            # self.probabilities = ... [probabilities of all actions]
+            logits, self.value = policy_and_value_network(self.observations)
+            self.probabilities = tf_layers.softmax(logits)
 
             self.chosen_actions = tf.placeholder(tf.int32, [None])
             self.returns = tf.placeholder(tf.float32, [None])
 
-            # TODO: compute loss of both the policy and value
-            # loss_policy = ... [cross_entropy between logits and chosen_actions,
-            #                    multiplied by (self.returns - tf.stop_gradient(self.value))]
-            # loss_value = ... [MSE of self.return and self.value]
-            # self.training = ... [use loss_policy + loss_value, and use learning_rate]
+            coefs = tf.sub(self.returns, tf.stop_gradient(self.value))
+            loss_policy = tf.mul(tf_losses.sparse_softmax_cross_entropy(logits, self.chosen_actions), coefs)
+
+            loss_value = tf.reduce_mean(tf.square(tf.sub(self.returns, self.value)))
+
+            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss_policy+loss_value)
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -54,12 +53,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="CartPole-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=1000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=2000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
+    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
     parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
@@ -74,11 +73,16 @@ if __name__ == "__main__":
 
     # Create policy and value network
     def policy_and_value_network(observations):
-        # TODO: return logits, value
-        # logits are computed from observations using a NN with a single hidden layer of size args.hidden_layer and output layer of size env.actions
-        # value is computed from observations using a NN with another single hidden layer of size args.hidden_layer and one output
-        # logits = ...
-        # value = ...
+        # logits are computed from observations using a NN with a single hidden layer
+        # of size args.hidden_layer and output layer of size env.actions
+        hidden = tf_layers.fully_connected(observations, args.hidden_layer)
+        logits = tf_layers.linear(hidden, env.actions)
+
+        # value is computed from observations using a NN with another single hidden
+        # layer of size args.hidden_layer and one output
+        hidden_value = tf_layers.fully_connected(observations, args.hidden_layer)
+        value = tf_layers.linear(hidden_value, 1)
+
         return logits, value
 
     pg = PolicyGradientWithBaseline(observations=env.observations, policy_and_value_network=policy_and_value_network,
@@ -96,9 +100,8 @@ if __name__ == "__main__":
                 if args.render_each and episode > 0 and episode % args.render_each == 0:
                     env.render()
 
-                # TODO: compute probabilities using pg.predict, and choose action according to the probabilities
-                # probabilities = ...
-                # action = ...
+                [probabilities] = pg.predict(observations=[observation])
+                action = np.random.choice(np.arange(len(probabilities)), p=probabilities)
 
                 observations.append(observation)
                 actions.append(action)
@@ -112,7 +115,12 @@ if __name__ == "__main__":
                 if done:
                     break
 
-            # TODO: sum and discount rewards, only the last t of them
+            begin_index = len(rewards) - t - 1
+            for i in range(begin_index, len(rewards)):
+                g_i = 0
+                for j in range(len(rewards) - i):
+                    g_i += rewards[i + j] * (args.gamma ** (j - 1))
+                rewards[i] = g_i
 
             episode_returns.append(total_reward)
             episode_lengths.append(t)
