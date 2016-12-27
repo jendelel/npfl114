@@ -1,0 +1,6 @@
+= Reinforcement learning
+
+* Q(s, a)
+* C(s, a) = # pocet kolik jich bylo
+* Q(s, a) = Q(s, a) + 1/(C(s, a) + 1) * (G_t - Q(s, a))
+* C(s, a)++
