@@ -19,7 +19,7 @@ class PolicyGradientWithBaseline:
         # Construct the graph
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
-            logits, self.value = policy_and_value_network(self.observations)
+            logits, self.value = policy_and_value_network(graph, self.observations)
             self.probabilities = tf_layers.softmax(logits)
 
             self.chosen_actions = tf.placeholder(tf.int32, [None])
@@ -72,18 +72,19 @@ if __name__ == "__main__":
         env.render()
 
     # Create policy and value network
-    def policy_and_value_network(observations):
-        # logits are computed from observations using a NN with a single hidden layer
-        # of size args.hidden_layer and output layer of size env.actions
-        hidden = tf_layers.fully_connected(observations, args.hidden_layer)
-        logits = tf_layers.linear(hidden, env.actions)
+    def policy_and_value_network(graph, observations):
+        with graph.as_default():
+            # logits are computed from observations using a NN with a single hidden layer
+            # of size args.hidden_layer and output layer of size env.actions
+            hidden = tf_layers.fully_connected(observations, args.hidden_layer)
+            logits = tf_layers.linear(hidden, env.actions)
 
-        # value is computed from observations using a NN with another single hidden
-        # layer of size args.hidden_layer and one output
-        hidden_value = tf_layers.fully_connected(observations, args.hidden_layer)
-        value = tf_layers.linear(hidden_value, 1)
+            # value is computed from observations using a NN with another single hidden
+            # layer of size args.hidden_layer and one output
+            hidden_value = tf_layers.fully_connected(observations, args.hidden_layer)
+            value = tf_layers.linear(hidden_value, 1)
 
-        return logits, value
+            return logits, value
 
     pg = PolicyGradientWithBaseline(observations=env.observations, policy_and_value_network=policy_and_value_network,
                                     learning_rate=args.alpha, threads=args.threads)

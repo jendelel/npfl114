@@ -53,15 +53,15 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="Acrobot-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=2000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=2500, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
+    parser.add_argument("--alpha", default=0.005, type=float, help="Learning rate.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
-    parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
+    parser.add_argument("--hidden_layer", default=30, type=int, help="Size of hidden layer.")
     args = parser.parse_args()
 
     # Create the environment

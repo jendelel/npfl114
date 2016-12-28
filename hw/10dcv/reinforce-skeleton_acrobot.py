@@ -50,7 +50,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="Acrobot-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=5000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=6000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")

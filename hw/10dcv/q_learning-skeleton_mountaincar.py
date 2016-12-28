@@ -20,9 +20,9 @@ if __name__ == "__main__":
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
 
     parser.add_argument("--alpha", default=0.2, type=float, help="Learning rate.")
-    parser.add_argument("--alpha_final", default=0.01, type=float, help="Learning rate decay rate.")
+    parser.add_argument("--alpha_final", default=0.15, type=float, help="Learning rate decay rate.")
     parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
-    parser.add_argument("--epsilon_final", default=0.01, type=float, help="Epsilon decay rate.")
+    parser.add_argument("--epsilon_final", default=0.001, type=float, help="Epsilon decay rate.")
     parser.add_argument("--gamma", default=0.999, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
@@ -67,4 +67,3 @@ if __name__ == "__main__":
             epsilon = np.exp(np.interp(episode + 1, [0, args.episodes], [np.log(args.epsilon), np.log(args.epsilon_final)]))
         if args.alpha_final:
             alpha = np.exp(np.interp(episode + 1, [0, args.episodes], [np.log(args.alpha), np.log(args.alpha_final)]))
-    print(np.mean(episode_rewards[-100:]))
