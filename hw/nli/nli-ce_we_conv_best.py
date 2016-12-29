@@ -38,7 +38,7 @@ class Network:
             #print("Conv:", conv_2.get_shape())
             return conv_1
 
-    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, num_filters=512, l2=0.001):
+    def __init__(self, rnn_cell, rnn_cell_dim, num_words, num_chars, logdir, expname, threads=1, seed=42, word_embedding=100, char_embedding=100, keep_prob=0.5, num_filters=512):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -117,6 +117,7 @@ class Network:
             pooled.append(tf_layers.max_pool2d(inputs=c5, kernel_size=[seq_len - 5 + 1, 1], stride=1))
             pooled.append(tf_layers.max_pool2d(inputs=c7, kernel_size=[seq_len - 7 + 1, 1], stride=1))
 
+
             pooled_outputs = tf.concat(3, pooled)
             print("pooled_outputs", pooled_outputs.get_shape())
             flatten = tf.reshape(pooled_outputs, [-1, 4 * num_filters])
@@ -126,11 +127,7 @@ class Network:
             # dec_outputs, _ = tf.nn.seq2seq.attention_decoder([dec_inputs], state_fw + state_bw, outputs, rnn_cell_co,
             #                                                  loop_function=loop_fn, output_size=self.LANGUAGES)
             output_layer = tf_layers.fully_connected(dropout, num_outputs=self.LANGUAGES)
-
-            train_vars = tf.trainable_variables()
-            lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in train_vars])*l2
-            self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages) + lossL2
-
+            self.loss = loss = tf_losses.sparse_softmax_cross_entropy(output_layer, self.languages)
             self.training = tf.train.AdamOptimizer(1e-4).minimize(loss, self.global_step)
             self.predictions = tf.cast(tf.argmax(output_layer, 1), tf.int32)
             self.accuracy = tf_metrics.accuracy(self.predictions, self.languages)
@@ -189,7 +186,6 @@ if __name__ == "__main__":
     parser.add_argument("--char_embedding", default=200, type=int, help="char_embedding")
     parser.add_argument("--keep_prob", default=0.5, type=float, help="dropout probability")
     parser.add_argument("--num_filters", default=1024, type=int, help="number of output filters from convolution")
-    parser.add_argument("--l2", default=0.0, type=float, help="l2 lambda")
 
     args = parser.parse_args()
 
@@ -201,13 +197,12 @@ if __name__ == "__main__":
 
     # Construct the network
     print("Constructing the network.", file=sys.stderr)
-    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}-nf{}-l2:{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding, args.num_filters, args.l2)
+    expname = "{}-{}{}-bs{}-epochs{}-char{}-word{}".format(tools.exp_name(__file__), args.rnn_cell, args.rnn_cell_dim, args.batch_size, args.epochs, args.char_embedding, args.word_embedding)
     network = Network(rnn_cell=args.rnn_cell, rnn_cell_dim=args.rnn_cell_dim,
                       num_words=len(data_train.vocabulary('words')), num_chars=len(data_train.vocabulary('chars')),
                       logdir=args.logdir, expname=expname, threads=args.threads,
                       word_embedding=args.word_embedding, char_embedding=args.char_embedding,
-                      keep_prob=args.keep_prob, num_filters=args.num_filters, 
-                      l2=args.l2)
+                      keep_prob=args.keep_prob, num_filters=args.num_filters)
 
     # Train
     best_dev_accuracy = 0
