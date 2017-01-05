@@ -21,7 +21,7 @@ class QNetwork:
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
 
-            self.q = tf_layers.softmax(q_network(self.observations))
+            self.q = q_network(self.observations)
             print("q", self.q.get_shape())
             self.action = tf.argmax(self.q, 1)
             print("action", self.action.get_shape())
@@ -53,15 +53,15 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="Taxi-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=20000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=1500, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
-    parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
-    parser.add_argument("--epsilon", default=1, type=float, help="Epsilon.")
+    parser.add_argument("--alpha", default=0.02, type=float, help="Learning rate.")
+    parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
     parser.add_argument("--epsilon_final", default=0.001, type=float, help="Epsilon decay rate.")
-    parser.add_argument("--gamma", default=0.99, type=float, help="Discounting factor.")
+    parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
     # Create the environment
@@ -100,7 +100,7 @@ if __name__ == "__main__":
             next_q_values = next_q_values.tolist()
 
             target_q_values = list(q_values)
-            target_q_values[action] += args.alpha * (reward + args.gamma * max(next_q_values) - q_values[action])
+            target_q_values[action] = reward + args.gamma * max(next_q_values)
 
             # Train the QNetwork using qn.train
             qn.train([observation], [target_q_values])
