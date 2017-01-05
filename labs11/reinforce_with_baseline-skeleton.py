@@ -7,8 +7,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as tf_layers
 
-class PolicyGradient:
-    def __init__(self, observations, policy_network, learning_rate, threads=1, seed=42):
+class PolicyGradientWithBaseline:
+    def __init__(self, observations, policy_and_value_network, learning_rate, threads=1, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
@@ -18,16 +18,19 @@ class PolicyGradient:
         # Construct the graph
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
-            # TODO: define the following, using policy_network
+            # TODO: define the following, using policy_and_value_network
             # logits = ...
+            # self.value = ...
             # self.probabilities = ... [probabilities of all actions]
 
             self.chosen_actions = tf.placeholder(tf.int32, [None])
-            self.rewards = tf.placeholder(tf.float32, [None])
+            self.returns = tf.placeholder(tf.float32, [None])
 
-            # TODO: compute loss, as cross_entropy between logits and chosen_actions, multiplying it by self.rewards
-            # loss = ...
-            # self.training = ... [use learning_rate]
+            # TODO: compute loss of both the policy and value
+            # loss_policy = ... [cross_entropy between logits and chosen_actions,
+            #                    multiplied by (self.returns - tf.stop_gradient(self.value))]
+            # loss_value = ... [MSE of self.return and self.value]
+            # self.training = ... [use loss_policy + loss_value, and use learning_rate]
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -36,11 +39,11 @@ class PolicyGradient:
         return self.session.run(self.probabilities,
                                 {self.observations: observations})
 
-    def train(self, observations, chosen_actions, rewards):
+    def train(self, observations, chosen_actions, returns):
         self.session.run(self.training,
                          {self.observations: observations,
                           self.chosen_actions: chosen_actions,
-                          self.rewards: rewards})
+                          self.returns: returns})
 
 if __name__ == "__main__":
     # Fix random seed
@@ -57,7 +60,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
-    parser.add_argument("--batch_size", default=5, type=int, help="Number of episodes to train on.")
+    parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
     parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
     args = parser.parse_args()
 
@@ -68,14 +71,19 @@ if __name__ == "__main__":
         env.reset()
         env.render()
 
-    # Create policy network
-    def policy_network(observations):
-        hidden = tf_layers.fully_connected(observations, args.hidden_layer, activation_fn=tf.nn.relu)
-        logits = tf_layers.linear(hidden, env.actions)
-        return logits
-    pg = PolicyGradient(observations=env.observations, policy_network=policy_network, learning_rate=args.alpha, threads=args.threads)
+    # Create policy and value network
+    def policy_and_value_network(observations):
+        # TODO: return logits, value
+        # logits are computed from observations using a NN with a single hidden layer of size args.hidden_layer and output layer of size env.actions
+        # value is computed from observations using a NN with another single hidden layer of size args.hidden_layer and one output
+        # logits = ...
+        # value = ...
+        return logits, value
 
-    episode_rewards, episode_lengths = [], []
+    pg = PolicyGradientWithBaseline(observations=env.observations, policy_and_value_network=policy_and_value_network,
+                                    learning_rate=args.alpha, threads=args.threads)
+
+    episode_returns, episode_lengths = [], []
     for batch_start in range(0, args.episodes, args.batch_size):
         # Collect data for training
         observations, actions, rewards = [], [], []
@@ -87,7 +95,7 @@ if __name__ == "__main__":
                 if args.render_each and episode > 0 and episode % args.render_each == 0:
                     env.render()
 
-                # TODO: predict action, using pg.predict and choosing action according to the probabilities
+                # TODO: compute probabilities using pg.predict, and choose action according to the probabilities
                 # probabilities = ...
                 # action = ...
 
@@ -105,9 +113,9 @@ if __name__ == "__main__":
 
             # TODO: sum and discount rewards, only the last t of them
 
-            episode_rewards.append(total_reward)
+            episode_returns.append(total_reward)
             episode_lengths.append(t)
-            if len(episode_rewards) % 10 == 0:
+            if len(episode_returns) % 10 == 0:
                 # Evaluate
                 observation, total_reward = env.reset(), 0
                 for i in range(args.max_steps):
@@ -119,6 +127,6 @@ if __name__ == "__main__":
                         break
 
                 print("Episode {}, current evaluation reward {}, mean 100-episode reward {}, mean 100-episode length {}.".format(
-                    episode + 1, total_reward, np.mean(episode_rewards[-100:]), np.mean(episode_lengths[-100:])))
+                    episode + 1, total_reward, np.mean(episode_returns[-100:]), np.mean(episode_lengths[-100:])))
 
         pg.train(observations, actions, rewards)
