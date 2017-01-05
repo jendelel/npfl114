@@ -4,10 +4,12 @@ from __future__ import print_function
 
 import environment_discrete
 import numpy as np
+from random import random, randint, seed
 
 if __name__ == "__main__":
     # Fix random seed
     np.random.seed(42)
+    seed(42)
 
     # Parse arguments
     import argparse
@@ -17,10 +19,10 @@ if __name__ == "__main__":
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
 
-    parser.add_argument("--alpha", default=0.1, type=float, help="Learning rate.")
+    parser.add_argument("--alpha", default=0.5, type=float, help="Learning rate.")
     parser.add_argument("--alpha_final", default=0, type=float, help="Learning rate decay rate.")
     parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
-    parser.add_argument("--epsilon_final", default=0.01, type=float, help="Epsilon decay rate.")
+    parser.add_argument("--epsilon_final", default=0.001, type=float, help="Epsilon decay rate.")
     parser.add_argument("--gamma", default=0.99, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
@@ -41,13 +43,15 @@ if __name__ == "__main__":
             if args.render_each and episode > 0 and episode % args.render_each == 0:
                 env.render()
 
-            # TODO: compute action using epsilon-greedy policy
-            # action = ...
+            if random() < epsilon:
+                action = randint(0, env.actions-1)
+            else:
+                action = Q[state].argmax()
 
             next_state, reward, done, _ = env.step(action)
             total_reward += reward
 
-            # Update Q
+            Q[state, action] += alpha * (reward + args.gamma * Q[next_state].max() - Q[state, action])
 
             state = next_state
             if done:

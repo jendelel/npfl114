@@ -2,6 +2,8 @@
 from __future__ import division
 from __future__ import print_function
 
+from random import random, randint, seed
+
 import environment_continuous
 import numpy as np
 import tensorflow as tf
@@ -19,14 +21,16 @@ class QNetwork:
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
 
-            # TODO: define the following, using q_network
-            # self.q = ...
-            # self.action = ... [best action]
+            self.q = tf_layers.softmax(q_network(self.observations))
+            print("q", self.q.get_shape())
+            self.action = tf.argmax(self.q, 1)
+            print("action", self.action.get_shape())
 
             self.target_q = tf.placeholder(tf.float32, [None, actions])
-            # TODO: compute loss using MSE
-            # loss = ...
-            # self.training = ... [use learning_rate]
+            print("target_q", self.target_q.get_shape())
+
+            loss = tf.reduce_mean(tf.square(tf.sub(self.target_q, self.q)))
+            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss)
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -43,20 +47,21 @@ class QNetwork:
 if __name__ == "__main__":
     # Fix random seed
     np.random.seed(42)
+    seed(42)
 
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="Taxi-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=1000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=20000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
-    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.1, type=float, help="Learning rate.")
-    parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
-    parser.add_argument("--epsilon_final", default=0.01, type=float, help="Epsilon decay rate.")
-    parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
+    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
+    parser.add_argument("--epsilon", default=1, type=float, help="Epsilon.")
+    parser.add_argument("--epsilon_final", default=0.001, type=float, help="Epsilon decay rate.")
+    parser.add_argument("--gamma", default=0.99, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
     # Create the environment
@@ -82,17 +87,20 @@ if __name__ == "__main__":
             if args.render_each and episode > 0 and episode % args.render_each == 0:
                 env.render()
 
-            # TODO: predict action (using epsion-greedy policy) and compute q_values using qn.predict
-            # action = ...
-            # q_values = ...
+            [action], [q_values] = qn.predict(observations=[observation])
+            q_values = q_values.tolist()
+
+            if random() < epsilon:
+                action = randint(0, env.actions-1)
 
             next_observation, reward, done, _ = env.step(action)
             total_reward += reward
 
-            # TODO: compute next_q_values for next_observation
-            # TODO: compute updates to q_values using Q_learning
-            # next_q_values = ...
-            # target_q_values = ...
+            _, [next_q_values] = qn.predict(observations=[next_observation])
+            next_q_values = next_q_values.tolist()
+
+            target_q_values = list(q_values)
+            target_q_values[action] += args.alpha * (reward + args.gamma * max(next_q_values) - q_values[action])
 
             # Train the QNetwork using qn.train
             qn.train([observation], [target_q_values])
