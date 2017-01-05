@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--epsilon", default=0.5, type=float, help="Epsilon.")
     parser.add_argument("--epsilon_final", default=0.01, type=float, help="Epsilon decay rate.")
-    parser.add_argument("--gamma", default=0.99999, type=float, help="Discounting factor.")
+    parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
     # Create the environment
@@ -59,19 +59,23 @@ if __name__ == "__main__":
             if done:
                 break
 
+        g = []
+
         for i in range(t):
             g_i = 0
             for j in range(t-i):
                 g_i += rewards[i+j]*(args.gamma**(j-1))
-            C[states[i], actions[i]] += g_i
-            steps[states[i], actions[i]] += 1
-        for s in states:
-            for a in actions:
-                num_steps = steps[s, a]
-                if num_steps == 0:
-                    Q[s, a] = 0
-                else:
-                    Q[s, a] = C[s, a]/num_steps
+
+            s = states[i]
+            a = actions[i]
+            C[s, a] += g_i
+            num_steps = steps[s, a] + 1
+            steps[s, a] = num_steps
+            if num_steps == 0:
+                Q[s, a] = 0
+            else:
+                Q[s, a] = C[s, a] / num_steps
+
         episode_rewards.append(total_reward)
         episode_lengths.append(t)
         if len(episode_rewards) % 10 == 0:
