@@ -19,18 +19,18 @@ class PolicyGradientWithBaseline:
         # Construct the graph
         with self.session.graph.as_default():
             self.observations = tf.placeholder(tf.float32, [None, observations])
-            logits, self.value = policy_and_value_network(graph, self.observations)
+            logits, self.value = policy_and_value_network(self.observations)
             self.probabilities = tf_layers.softmax(logits)
 
             self.chosen_actions = tf.placeholder(tf.int32, [None])
             self.returns = tf.placeholder(tf.float32, [None])
 
             coefs = tf.sub(self.returns, tf.stop_gradient(self.value))
-            loss_policy = tf.mul(tf_losses.sparse_softmax_cross_entropy(logits, self.chosen_actions), coefs)
+            loss_policy = tf.mul(tf.nn.sparse_softmax_cross_entropy_with_logits(logits, self.chosen_actions), coefs)
 
             loss_value = tf.reduce_mean(tf.square(tf.sub(self.returns, self.value)))
 
-            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss_policy+loss_value)
+            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=tf.reduce_mean(loss_policy)+loss_value)
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -53,12 +53,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="CartPole-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=2000, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=600, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
+    parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
     parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
@@ -72,19 +72,18 @@ if __name__ == "__main__":
         env.render()
 
     # Create policy and value network
-    def policy_and_value_network(graph, observations):
-        with graph.as_default():
-            # logits are computed from observations using a NN with a single hidden layer
-            # of size args.hidden_layer and output layer of size env.actions
-            hidden = tf_layers.fully_connected(observations, args.hidden_layer)
-            logits = tf_layers.linear(hidden, env.actions)
+    def policy_and_value_network(observations):
+        # logits are computed from observations using a NN with a single hidden layer
+        # of size args.hidden_layer and output layer of size env.actions
+        hidden = tf_layers.fully_connected(observations, args.hidden_layer)
+        logits = tf_layers.linear(hidden, env.actions)
 
-            # value is computed from observations using a NN with another single hidden
-            # layer of size args.hidden_layer and one output
-            hidden_value = tf_layers.fully_connected(observations, args.hidden_layer)
-            value = tf_layers.linear(hidden_value, 1)
+        # value is computed from observations using a NN with another single hidden
+        # layer of size args.hidden_layer and one output
+        hidden_value = tf_layers.fully_connected(observations, args.hidden_layer)
+        value = tf_layers.linear(hidden_value, 1)
 
-            return logits, value
+        return logits, value
 
     pg = PolicyGradientWithBaseline(observations=env.observations, policy_and_value_network=policy_and_value_network,
                                     learning_rate=args.alpha, threads=args.threads)

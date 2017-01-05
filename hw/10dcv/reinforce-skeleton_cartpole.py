@@ -26,8 +26,8 @@ class PolicyGradient:
             self.chosen_actions = tf.placeholder(tf.int32, [None])
             self.rewards = tf.placeholder(tf.float32, [None])
 
-            loss = tf.mul(tf_losses.sparse_softmax_cross_entropy(logits, self.chosen_actions), self.rewards)
-            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=loss)
+            losses = tf.mul(tf.nn.sparse_softmax_cross_entropy_with_logits(logits, self.chosen_actions), self.rewards)
+            self.training = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=tf.reduce_mean(losses))
 
             # Initialize variables
             self.session.run(tf.initialize_all_variables())
@@ -50,14 +50,14 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="CartPole-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=3200, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=1000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
-    parser.add_argument("--alpha", default=0.001, type=float, help="Learning rate.")
+    parser.add_argument("--alpha", default=0.01, type=float, help="Learning rate.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
-    parser.add_argument("--batch_size", default=1, type=int, help="Number of episodes to train on.")
+    parser.add_argument("--batch_size", default=5, type=int, help="Number of episodes to train on.")
     parser.add_argument("--hidden_layer", default=20, type=int, help="Size of hidden layer.")
     args = parser.parse_args()
 
