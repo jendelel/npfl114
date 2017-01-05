@@ -4,18 +4,16 @@ from __future__ import print_function
 
 import environment_discrete
 import numpy as np
-from random import random, randint, seed
 
 if __name__ == "__main__":
     # Fix random seed
     np.random.seed(42)
-    seed(42)
 
     # Parse arguments
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="CartPole-v1", type=str, help="Name of the environment.")
-    parser.add_argument("--episodes", default=500, type=int, help="Episodes in a batch.")
+    parser.add_argument("--episodes", default=1000, type=int, help="Episodes in a batch.")
     parser.add_argument("--max_steps", default=500, type=int, help="Maximum number of steps.")
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
 
@@ -43,8 +41,8 @@ if __name__ == "__main__":
             if args.render_each and episode > 0 and episode % args.render_each == 0:
                 env.render()
 
-            if random() < epsilon:
-                action = randint(0, env.actions-1)
+            if np.random.random_sample() < epsilon:
+                action = np.random.random_integers(0, env.actions-1)
             else:
                 action = Q[state].argmax()
 
@@ -59,16 +57,14 @@ if __name__ == "__main__":
             if done:
                 break
 
-        g = []
-
-        for i in range(t):
-            g_i = 0
-            for j in range(t-i):
-                g_i += rewards[i+j]*(args.gamma**(j-1))
+        last_g = 0
+        for i in range(t, 0, -1):
+            g = rewards[i] + args.gamma * last_g
+            last_g = g
 
             s = states[i]
             a = actions[i]
-            C[s, a] += g_i
+            C[s, a] += g
             num_steps = steps[s, a] + 1
             steps[s, a] = num_steps
             if num_steps == 0:
